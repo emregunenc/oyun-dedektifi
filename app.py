@@ -4,12 +4,11 @@ from bs4 import BeautifulSoup
 from howlongtobeatpy import HowLongToBeat
 import re
 import json
-import random
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Oyun Dedektifi Pro", page_icon="🎮", layout="wide")
 
-# --- CSS TASARIMI ---
+# --- GÖRSEL TASARIM ---
 st.markdown("""
     <style>
     .stMetric { background-color: #f8f9fb; padding: 15px; border-radius: 12px; border: 1px solid #eee; }
@@ -32,7 +31,7 @@ except:
     canli_kur = 34.5
 
 # --- ARAMA ---
-oyun_adi = st.text_input("Oyun adını yazın:", placeholder="Örn: Hades, Elden Ring, God of War...")
+oyun_adi = st.text_input("Oyun adını yazın:", placeholder="Hades, Elden Ring, God of War...")
 analiz_butonu = st.button("Analiz Et", type="primary")
 
 if analiz_butonu and oyun_adi:
@@ -42,12 +41,12 @@ if analiz_butonu and oyun_adi:
         try:
             s_res = scraper.get(s_url).json()
             if s_res and s_res['items']:
-                # AKILLI EŞLEŞME (Hades Fix)
+                # --- AKILLI EŞLEŞME MANTIĞI ---
                 items = s_res['items']
-                o = items[0]
-                for item in items[:5]:
+                o = items[0] # Varsayılan en popüler
+                for item in items[:5]: # İlk 5 sonucu tara
                     if item['name'].lower() == oyun_adi.strip().lower():
-                        o = item
+                        o = item # Tam eşleşme bulundu (Hades Fix)!
                         break
                 
                 app_id = o['id']
@@ -67,10 +66,9 @@ if analiz_butonu and oyun_adi:
                 st.markdown("### 💰 Fiyat Karşılaştırması")
                 c1, c2, c3 = st.columns(3)
                 
-                # SÜTUN 1: STEAM
-                c1.metric("Steam", f"{f_tl_steam:.0f} TL", f"${f_usd:.2f}")
+                c1.metric("Steam (USD->TL)", f"{f_tl_steam:.0f} TL", f"${f_usd:.2f}")
                 
-                # SÜTUN 2: PS STORE
+                # PS Store
                 ps_url = f"https://store.playstation.com/tr-tr/search/{temiz_isim.replace(' ', '%20')}"
                 ps_price = "Bulunamadı"
                 try:
@@ -83,28 +81,17 @@ if analiz_butonu and oyun_adi:
                     if ps_price != "Bulunamadı" and len(ps_price) < 20: st.metric("PS Store", ps_price)
                     else: st.link_button("PS Fiyatı 🔗", ps_url)
 
-                # SÜTUN 3: EPIC GAMES (Cloud Bypass v2)
-                epic_url = f"https://store.epicgames.com/tr/browse?q={temiz_isim.replace(' ', '%20')}"
+                # Epic Games
+                epic_search_url = f"https://store.epicgames.com/tr/browse?q={temiz_isim.replace(' ', '%20')}"
                 epic_price = "Bulunamadı"
                 try:
-                    e_res = scraper.get(epic_url, timeout=10)
-                    # Yöntem A: Doğrudan ₺ arama
+                    e_res = scraper.get(epic_search_url, timeout=7)
                     epic_matches = re.findall(r'₺[\d\s.,]+', e_res.text)
-                    if epic_matches:
-                        epic_price = epic_matches[0].strip()
-                    else:
-                        # Yöntem B: JSON Verisi içinden sızma
-                        price_match = re.search(r'"discountPrice":(\d+)', e_res.text)
-                        if price_match:
-                            val = int(price_match.group(1)) / 100
-                            epic_price = f"₺{val:,.2f}"
+                    if epic_matches: epic_price = epic_matches[0].strip()
                 except: pass
-                
                 with c3:
-                    if epic_price != "Bulunamadı" and len(epic_price) < 15:
-                        st.metric("Epic Games", epic_price)
-                    else:
-                        st.link_button("Epic Fiyatı 🔗", epic_url)
+                    if epic_price != "Bulunamadı" and len(epic_price) < 15: st.metric("Epic Games", epic_price)
+                    else: st.link_button("Epic Fiyatı 🔗", epic_search_url)
 
                 # --- SKORLAR & SÜRELER ---
                 st.markdown("---")
@@ -114,8 +101,8 @@ if analiz_butonu and oyun_adi:
                 try:
                     r_res = scraper.get(f"https://store.steampowered.com/appreviews/{app_id}?json=1&language=all").json()
                     oran = (r_res['query_summary']['total_positive'] / r_res['query_summary']['total_reviews']) * 100
-                    p1.metric("Steam Puanı", f"%{int(oran)}")
-                except: p1.metric("Steam Puanı", "N/A")
+                    p1.metric("Steam Kullanıcıları", f"%{int(oran)}")
+                except: p1.metric("Steam Kullanıcıları", "N/A")
 
                 # Metascore
                 meta_score = "N/A"
@@ -128,7 +115,7 @@ if analiz_butonu and oyun_adi:
                 except: pass
                 p2.metric("Metascore", f"{meta_score}/100" if meta_score != "N/A" else "N/A")
 
-                # HLTB
+                # HLTB (Oynanış Süreleri)
                 st.markdown("---")
                 st.write("### ⏳ Oynanış Süreleri")
                 try:
