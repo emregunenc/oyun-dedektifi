@@ -9,96 +9,126 @@ import os
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Gamer's Archive", page_icon="🏛️", layout="centered")
 
-# --- GENİŞLETİLMİŞ AKILLI SÖZLÜK (Kısaltma -> Resmi İsim) ---
+# --- AKILLI SÖZLÜK ---
 SÖZLÜK = {
-    # Eklediklerimiz
-    "rdr": "Red Dead Redemption 2",
-    "rdr2": "Red Dead Redemption 2",
-    "tlou 2": "The Last of Us Part II",
-    "tlou2": "The Last of Us Part II",
-    "tlou": "The Last of Us Part I",
-    "pes": "Pro Evolution Soccer",
-    "gta 5": "Grand Theft Auto V",
-    "gta v": "Grand Theft Auto V",
-    "gow": "God of War",
-    "gow r": "God of War Ragnarök",
-    "er": "Elden Ring",
-    "fifa": "EA SPORTS FC 24",
-    "cod": "Call of Duty",
-    "ac": "Assassin's Creed",
-    "cp2077": "Cyberpunk 2077",
-    "mc": "Minecraft",
-    "f1": "F1 24",
-    "re4": "Resident Evil 4",
-    "witcher 3": "The Witcher 3: Wild Hunt"
+    "rdr": "Red Dead Redemption 2", "rdr2": "Red Dead Redemption 2",
+    "tlou 2": "The Last of Us Part II", "tlou2": "The Last of Us Part II",
+    "pes": "Pro Evolution Soccer", "gta 5": "Grand Theft Auto V",
+    "gow": "God of War", "er": "Elden Ring"
 }
 
 def isim_duzelt(arama):
     arama_temiz = arama.lower().strip()
     return SÖZLÜK.get(arama_temiz, arama)
 
-# --- HAFIZA DOSYA YOLU ---
+# --- HAFIZA YÖNETİMİ ---
 DB_FILE = "oyun_kutuphanem.pkl"
 
 def verileri_kaydet():
-    data = {'backlog': st.session_state.backlog, 'completed': st.session_state.completed, 'cancelled': st.session_state.cancelled}
+    data = {'backlog': list(st.session_state.backlog), 'completed': list(st.session_state.completed), 'cancelled': list(st.session_state.cancelled)}
     with open(DB_FILE, 'wb') as f: pickle.dump(data, f)
 
 def verileri_yukle():
+    if 'backlog' not in st.session_state: st.session_state.backlog = []
+    if 'completed' not in st.session_state: st.session_state.completed = []
+    if 'cancelled' not in st.session_state: st.session_state.cancelled = []
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, 'rb') as f:
-            data = pickle.load(f)
-            st.session_state.backlog = data.get('backlog', [])
-            st.session_state.completed = data.get('completed', [])
-            st.session_state.cancelled = data.get('cancelled', [])
-    else:
-        st.session_state.backlog = st.session_state.completed = st.session_state.cancelled = []
+        try:
+            with open(DB_FILE, 'rb') as f:
+                data = pickle.load(f)
+                st.session_state.backlog = list(data.get('backlog', []))
+                st.session_state.completed = list(data.get('completed', []))
+                st.session_state.cancelled = list(data.get('cancelled', []))
+        except: pass
 
-# --- GÖRSEL TASARIM (Android Renk Fix Dahil) ---
+# --- GÖRSEL TASARIM (Mikro Butonlar) ---
 st.markdown("""
     <style>
-    .stMetric { background-color: #ffffff !important; padding: 15px; border-radius: 12px; border: 2px solid #f0f2f6 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    [data-testid="stMetricValue"] { color: #1a1a1a !important; font-size: 1.8rem !important; font-weight: 800 !important; }
-    [data-testid="stMetricLabel"] { color: #444444 !important; font-size: 1rem !important; font-weight: 600 !important; }
-    .stButton>button { width: 100%; border-radius: 20px; font-weight: bold; }
-    .hltb-header { font-size: 1.4rem; font-weight: 700; color: #ff8c00; margin-bottom: 10px; border-left: 5px solid #ff8c00; padding-left: 10px; }
-    .cat-header { font-size: 1.1rem; font-weight: 700; color: #1a1a1a !important; border-bottom: 2px solid #eee; margin-top: 10px; }
-    div[data-testid="stCheckbox"] label p { font-size: 1.25rem !important; color: #1a1a1a !important; font-weight: 600 !important; }
-    .played-text { color: #28a745 !important; font-weight: bold; font-size: 1.1rem; }
-    .vazgecildi-text { color: #888 !important; text-decoration: line-through; font-size: 1.0rem; }
-    .stButton > button[key^="vaz_"] { padding: 0px !important; height: 22px !important; width: 22px !important; font-size: 0.7rem !important; border-radius: 50% !important; border: 1px solid #ddd !important; color: #999 !important; }
+    .stMetric { background-color: #ffffff !important; padding: 15px; border-radius: 12px; border: 2px solid #f0f2f6 !important; }
+    .cat-header { font-size: 1.1rem; font-weight: 700; color: #1a1a1a !important; border-bottom: 2px solid #eee; margin-top: 15px; margin-bottom: 10px; }
+    .played-text { color: #28a745 !important; font-weight: 600; font-size: 0.9rem; }
+    .vazgecildi-text { color: #888 !important; text-decoration: line-through; font-size: 0.9rem; }
+    
+    /* 🔴 MİKRO BUTON TASARIMI (Undo ve Çarpı) */
+    .stButton > button[key^="undo_"], .stButton > button[key^="cancel_"] { 
+        padding: 0px !important; 
+        height: 18px !important; 
+        width: 18px !important; 
+        min-height: 18px !important;
+        min-width: 18px !important;
+        font-size: 0.6rem !important; 
+        line-height: 1 !important;
+        border-radius: 50% !important; 
+        background-color: transparent !important; 
+        color: #bbb !important; 
+        border: 1px solid #ddd !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    .stButton > button[key^="undo_"]:hover, .stButton > button[key^="cancel_"]:hover {
+        border-color: #ff4b4b !important;
+        color: #ff4b4b !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- SESSION STATE BAŞLATMA ---
-if 'backlog' not in st.session_state: verileri_yukle()
+verileri_yukle()
 if 'current_game' not in st.session_state: st.session_state.current_game = None
 
 # --- YAN PANEL (SIDEBAR) ---
 with st.sidebar:
     st.title("🏛️ Gamer's Archive")
+    
+    # 🎯 Oynanacaklar
     active = [g for g in st.session_state.backlog if g not in st.session_state.completed and g not in st.session_state.cancelled]
     if active:
         st.markdown('<p class="cat-header">🎯 Oynanacaklar</p>', unsafe_allow_html=True)
         for g in active:
             c1, c2 = st.columns([5, 1])
             with c1:
-                if st.checkbox(g, key=f"sb_{g}"): st.session_state.completed.append(g); verileri_kaydet(); st.rerun()
+                if st.checkbox(g, key=f"tick_{g}"):
+                    if g not in st.session_state.completed:
+                        st.session_state.completed.append(g)
+                        verileri_kaydet(); st.rerun()
             with c2:
-                if st.button("✖", key=f"vaz_{g}"): st.session_state.cancelled.append(g); verileri_kaydet(); st.rerun()
+                if st.button("✖", key=f"cancel_{g}"):
+                    if g not in st.session_state.cancelled:
+                        st.session_state.cancelled.append(g)
+                        verileri_kaydet(); st.rerun()
 
+    # ✅ Oynadıklarım
     if st.session_state.completed:
         st.markdown('<p class="cat-header">✅ Oynadıklarım</p>', unsafe_allow_html=True)
-        for g in st.session_state.completed: st.markdown(f"<p class='played-text'>✦ {g}</p>", unsafe_allow_html=True)
+        for g in st.session_state.completed:
+            c1, c2 = st.columns([5, 1])
+            with c1: st.markdown(f"<p class='played-text'>✦ {g}</p>", unsafe_allow_html=True)
+            with c2:
+                if st.button("↩", key=f"undo_comp_{g}"):
+                    st.session_state.completed.remove(g)
+                    verileri_kaydet(); st.rerun()
 
+    # 📁 Vazgeçtiklerim
     if st.session_state.cancelled:
         st.markdown('<p class="cat-header">📁 Vazgeçtiklerim</p>', unsafe_allow_html=True)
-        for g in st.session_state.cancelled: st.markdown(f"<p class='vazgecildi-text'>✖ {g}</p>", unsafe_allow_html=True)
+        for g in st.session_state.cancelled:
+            c1, c2 = st.columns([5, 1])
+            with c1: st.markdown(f"<p class='vazgecildi-text'>✖ {g}</p>", unsafe_allow_html=True)
+            with c2:
+                if st.button("↩", key=f"undo_canc_{g}"):
+                    st.session_state.cancelled.remove(g)
+                    verileri_kaydet(); st.rerun()
+
+    st.markdown("---")
+    if st.button("Tüm Verileri Sıfırla"):
+        st.session_state.backlog = st.session_state.completed = st.session_state.cancelled = []
+        if os.path.exists(DB_FILE): os.remove(DB_FILE)
+        st.rerun()
 
 # --- ANA AKIŞ ---
 st.title("🏛️ Gamer's Archive")
 scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-oyun_adi = st.text_input("Oyun adını yazın:", placeholder="Örn: rdr, tlou 2, pes...")
+oyun_adi = st.text_input("Oyun adını yazın:", placeholder="Örn: rdr, pes, gta 5...")
 
 if st.button("Analiz Et", type="primary"):
     if oyun_adi:
@@ -115,7 +145,6 @@ if st.button("Analiz Et", type="primary"):
                 else: st.session_state.current_game = "NOT_FOUND"
             except: st.session_state.current_game = None
 
-# --- VERİ GÖSTERİMİ ---
 if st.session_state.current_game and st.session_state.current_game != "NOT_FOUND":
     o = st.session_state.current_game
     app_id, temiz_isim = o['id'], o['name']
@@ -124,21 +153,23 @@ if st.session_state.current_game and st.session_state.current_game != "NOT_FOUND
     col_t, col_b = st.columns([1.8, 1])
     with col_t: st.subheader(f"🔍 {temiz_isim}")
     with col_b:
-        is_in = temiz_isim in st.session_state.backlog
-        if st.button("❌ Kaldır" if is_in else "➕ Arşive Ekle"):
-            if is_in: 
-                st.session_state.backlog.remove(temiz_isim)
+        is_in_backlog = temiz_isim in st.session_state.backlog
+        if st.button("❌ Kaldır" if is_in_backlog else "➕ Arşive Ekle"):
+            if is_in_backlog: 
+                if temiz_isim in st.session_state.backlog: st.session_state.backlog.remove(temiz_isim)
                 if temiz_isim in st.session_state.completed: st.session_state.completed.remove(temiz_isim)
                 if temiz_isim in st.session_state.cancelled: st.session_state.cancelled.remove(temiz_isim)
-            else: st.session_state.backlog.append(temiz_isim)
+            else: 
+                if temiz_isim not in st.session_state.backlog: st.session_state.backlog.append(temiz_isim)
             verileri_kaydet(); st.rerun()
 
     c1, c2 = st.columns(2)
     try:
-        kur = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
+        kur_res = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()
+        kur = kur_res['rates']['TRY']
         f_usd = o.get('price', {}).get('final', 0) / 100
         c1.metric("Steam (Tahmini)", f"{f_usd * kur:.0f} TL", f"${f_usd:.2f}")
-    except: c1.metric("Steam", "Kur Alınamadı")
+    except: c1.metric("Steam", "Kur Hatası")
 
     ps_url = f"https://store.playstation.com/tr-tr/search/{temiz_isim.replace(' ', '%20')}"
     ps_price = "Bulunamadı"
@@ -181,6 +212,3 @@ if st.session_state.current_game and st.session_state.current_game != "NOT_FOUND
             h2.warning(f"**Ekstra**\n\n{b.main_extra} Sa.")
             h3.error(f"**%100**\n\n{b.completionist} Sa.")
     except: st.write("Veri alınamadı.")
-
-elif st.session_state.current_game == "NOT_FOUND":
-    st.error("Oyun bulunamadı!")
