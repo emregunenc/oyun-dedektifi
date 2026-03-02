@@ -1,0 +1,7 @@
+# Python veri dosyalarını yoksay
+*.pkl
+oyun_kütüphanem.pkl
+
+# Streamlit ve Python önbelleklerini yoksay
+__pycache__/
+.streamlit/
