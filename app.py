@@ -31,138 +31,110 @@ def verileri_yukle():
 
 verileri_yukle()
 
-# --- AKSİYON FONKSİYONLARI ---
-def move_complete(game):
-    if game not in st.session_state.completed: st.session_state.completed.append(game)
+# --- 🎯 AKSİYON MANTIĞI (URL Parametreleri İle Tıklama) ---
+# Bu kısım ikonlara tıklandığında sayfanın en başında çalışır ve listeyi günceller.
+params = st.query_params
+if "act" in params:
+    action = params["act"]
+    game = params["game"]
+    
+    if action == "done" and game in st.session_state.backlog:
+        st.session_state.completed.append(game)
+    elif action == "drop" and game in st.session_state.backlog:
+        st.session_state.cancelled.append(game)
+    elif action == "undo_done" and game in st.session_state.completed:
+        st.session_state.completed.remove(game)
+    elif action == "undo_drop" and game in st.session_state.cancelled:
+        st.session_state.cancelled.remove(game)
+    
+    if game not in st.session_state.backlog and action in ["undo_done", "undo_drop"]:
+        st.session_state.backlog.append(game)
+        
     verileri_kaydet()
+    st.query_params.clear() # URL'i temizle
+    st.rerun() # Sayfayı yenile
 
-def move_cancel(game):
-    if game not in st.session_state.cancelled: st.session_state.cancelled.append(game)
-    verileri_kaydet()
-
-def undo_action(game, from_list):
-    if from_list == "completed" and game in st.session_state.completed: st.session_state.completed.remove(game)
-    elif from_list == "cancelled" and game in st.session_state.cancelled: st.session_state.cancelled.remove(game)
-    if game not in st.session_state.backlog: st.session_state.backlog.append(game)
-    verileri_kaydet()
-
-# --- GÖRSEL TASARIM ---
+# --- 💉 GÖRSEL TASARIM (Custom Flexbox CSS) ---
 st.markdown("""
     <style>
     .stApp { background-color: #f9f9f9; }
-    .cat-header {
-        font-size: 0.85rem; font-weight: 700; color: #555;
-        border-bottom: 1px solid #eee; margin-top: 15px; padding-bottom: 3px;
+    .cat-header { font-size: 0.85rem; font-weight: 700; color: #555; border-bottom: 1px solid #eee; margin-top: 15px; padding-bottom: 3px; }
+    
+    /* 🔴 CUSTOM ROW: Kolon kullanmadan ikonları metne sabitleyen yapı */
+    .game-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 0;
+        gap: 10px;
     }
-
-    /* ── SIDEBAR SATIR: isim alanı genişlesin, butonlar sabit kalsın ── */
-    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: center !important;
-        gap: 2px !important;
-        width: 100% !important;
-    }
-
-    /* İsim sütunu: kalan tüm alanı al */
-    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {
-        flex: 1 1 0% !important;
-        min-width: 0 !important;
-        max-width: none !important;
-        overflow: hidden !important;
-    }
-
-    /* Buton sütunları: 28px sabit */
-    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] > div[data-testid="column"]:not(:first-child) {
-        flex: 0 0 28px !important;
-        width: 28px !important;
-        min-width: 28px !important;
-        max-width: 28px !important;
-    }
-
-    /* NANO BUTONLAR */
-    [data-testid="stSidebar"] .stButton > button {
-        border: none !important;
-        background: transparent !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        color: #bbb !important;
-        font-size: 15px !important;
-        height: 28px !important;
-        width: 28px !important;
-        min-width: 28px !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-    }
-    [data-testid="stSidebar"] .stButton > button:hover { color: #ff4b4b !important; }
-
-    /* Oyun ismi */
-    .game-name-side {
+    .game-title {
         font-size: 13px;
         color: #333;
-        display: block;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        width: 100%;
+        flex-grow: 1;
     }
-
-    /* ARŞİVİME EKLE BUTONU */
+    .icon-group {
+        display: flex;
+        gap: 12px;
+        flex-shrink: 0; /* İkonların mobilde daralmasını engeller */
+    }
+    .nano-icon {
+        text-decoration: none !important;
+        color: #bbb !important;
+        font-size: 16px;
+        font-weight: bold;
+        transition: 0.2s;
+    }
+    .nano-icon:hover { color: #ff4b4b !important; }
+    
+    /* 🟢 ANA BUTON (Yeşil & Oval) */
     div.stButton > button[key="main_add"] {
-        background-color: #28a745 !important;
-        color: white !important;
-        font-weight: bold !important;
-        border-radius: 20px !important;
-        padding: 0.5rem 1.5rem !important;
-        border: none !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+        background-color: #28a745 !important; color: white !important; font-weight: bold !important;
+        border-radius: 20px !important; padding: 0.5rem 1.5rem !important; border: none !important;
     }
-
-    .badge-card {
-        background: #fff; padding: 10px; border-radius: 10px;
-        border-left: 5px solid #ddd;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        margin-bottom: 10px; font-size: 14px;
-    }
+    .badge-card { background:#fff; padding:10px; border-radius:10px; border-left: 5px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px; font-size: 14px; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- YAN PANEL (SIDEBAR) ---
 with st.sidebar:
     st.title("🏛️ Archive")
-
+    
     # 🎯 Oynanacaklar
     active = [g for g in st.session_state.backlog if g not in st.session_state.completed and g not in st.session_state.cancelled]
     if active:
         st.markdown('<p class="cat-header">🎯 Oynanacaklar</p>', unsafe_allow_html=True)
         for g in active:
-            c_txt, c_c, c_x = st.columns([10, 1, 1])
-            c_txt.markdown(f"<span class='game-name-side'>{g}</span>", unsafe_allow_html=True)
-            if c_c.button("✓", key=f"c_{g}"): move_complete(g); st.rerun()
-            if c_x.button("✕", key=f"x_{g}"): move_cancel(g); st.rerun()
+            st.markdown(f"""
+                <div class="game-row">
+                    <span class="game-title">{g}</span>
+                    <div class="icon-group">
+                        <a href="/?act=done&game={g}" target="_self" class="nano-icon">✓</a>
+                        <a href="/?act=drop&game={g}" target="_self" class="nano-icon">✕</a>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
     # ✅ Bitenler
     if st.session_state.completed:
         st.markdown('<p class="cat-header">✅ Bitenler</p>', unsafe_allow_html=True)
         for g in st.session_state.completed:
-            c_txt, c_u = st.columns([10, 1])
-            c_txt.markdown(f"<span class='game-name-side' style='color:#28a745;'>✦ {g}</span>", unsafe_allow_html=True)
-            if c_u.button("↩", key=f"u_c_{g}"): undo_action(g, "completed"); st.rerun()
-
-    # 📁 Vazgeçilenler
-    if st.session_state.cancelled:
-        st.markdown('<p class="cat-header">📁 Vazgeçilenler</p>', unsafe_allow_html=True)
-        for g in st.session_state.cancelled:
-            c_txt, c_u = st.columns([10, 1])
-            c_txt.markdown(f"<span class='game-name-side' style='color:#aaa; text-decoration:line-through;'>✖ {g}</span>", unsafe_allow_html=True)
-            if c_u.button("↩", key=f"u_v_{g}"): undo_action(g, "cancelled"); st.rerun()
+            st.markdown(f"""
+                <div class="game-row">
+                    <span class="game-title" style="color:#28a745;">✦ {g}</span>
+                    <div class="icon-group">
+                        <a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
 # --- ANA AKIŞ ---
 st.title("🏛️ Gamer's Archive")
 scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-oyun_adi = st.text_input("Oyun Ara:", placeholder="Hades, Elden Ring...")
+oyun_adi = st.text_input("Oyun Ara:", placeholder="Elden Ring, Hades...")
 
 if st.button("Analiz Et", type="primary"):
     if oyun_adi:
@@ -181,20 +153,21 @@ if 'current_game' in st.session_state and st.session_state.current_game:
         o = st.session_state.current_game
         app_id, temiz_isim = o['id'], o['name']
         st.image(f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg", use_container_width=True)
-
+        
         c_title, c_add = st.columns([2, 1.3])
         c_title.subheader(temiz_isim)
-
+        
         is_in = temiz_isim in st.session_state.backlog
         if c_add.button("❌ Kaldır" if is_in else "➕ Arşivime Ekle", key="main_rem" if is_in else "main_add"):
             if is_in:
-                if temiz_isim in st.session_state.backlog: st.session_state.backlog.remove(temiz_isim)
+                st.session_state.backlog.remove(temiz_isim)
                 if temiz_isim in st.session_state.completed: st.session_state.completed.remove(temiz_isim)
                 if temiz_isim in st.session_state.cancelled: st.session_state.cancelled.remove(temiz_isim)
-            else: st.session_state.backlog.append(temiz_isim)
+            else:
+                st.session_state.backlog.append(temiz_isim)
             verileri_kaydet(); st.rerun()
 
-        # Metrikler ve HLTB
+        # Fiyatlar, Skorlar ve Süreler (Stabil Yapı)
         c1, c2 = st.columns(2)
         try:
             kur = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
@@ -207,7 +180,7 @@ if 'current_game' in st.session_state and st.session_state.current_game:
             c2.markdown(f'<div class="badge-card" style="border-left-color:#003087"><b>PS Store:</b><br>{ps_price}</div>', unsafe_allow_html=True)
         except: pass
 
-        st.markdown("---")
+        st.markdown("---") 
         s1, s2 = st.columns(2)
         try:
             r_res = scraper.get(f"https://store.steampowered.com/appreviews/{app_id}?json=1&language=all").json()
