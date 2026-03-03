@@ -16,7 +16,7 @@ KISALTMALAR = {
 }
 
 # --- HAFIZA YÖNETİMİ ---
-DB_FILE = "oyun_kutuphanem_v5_7.pkl"
+DB_FILE = "oyun_kutuphanem_v5_9.pkl"
 
 def verileri_kaydet():
     data = {
@@ -47,57 +47,54 @@ verileri_yukle()
 
 # --- 🎯 AKSİYON MANTIĞI ---
 params = st.query_params
+scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
+
 if "act" in params:
     action, game = params["act"], params["game"]
-    for cat in list(st.session_state.backlog_dict.keys()):
-        if game in st.session_state.backlog_dict[cat]: st.session_state.backlog_dict[cat].remove(game)
-    if game in st.session_state.completed: st.session_state.completed.remove(game)
-    if game in st.session_state.cancelled: st.session_state.cancelled.remove(game)
+    
+    # 💉 ODAKLANMA (FOCUS) OPERASYONU
+    if action == "focus":
+        with st.spinner('Oyun masaya yatırılıyor...'):
+            term = KISALTMALAR.get(game.lower().strip(), game)
+            try:
+                s_res = scraper.get(f"https://store.steampowered.com/api/storesearch/?term={term}&l=turkish&cc=TR").json()
+                if s_res and s_res['items']:
+                    items = s_res['items']
+                    exact = next((i for i in items if i['name'].lower() == term.lower()), None)
+                    st.session_state.current_game = exact if exact else items[0]
+            except: pass
+    else:
+        # Standart Listeler Arası Geçiş (Done, Drop, Undo)
+        for cat in list(st.session_state.backlog_dict.keys()):
+            if game in st.session_state.backlog_dict[cat]: st.session_state.backlog_dict[cat].remove(game)
+        if game in st.session_state.completed: st.session_state.completed.remove(game)
+        if game in st.session_state.cancelled: st.session_state.cancelled.remove(game)
 
-    if action == "done": st.session_state.completed.append(game)
-    elif action == "drop": st.session_state.cancelled.append(game)
-    elif "undo" in action: st.session_state.backlog_dict["Genel"].append(game)
+        if action == "done": st.session_state.completed.append(game)
+        elif action == "drop": st.session_state.cancelled.append(game)
+        elif "undo" in action: st.session_state.backlog_dict["Genel"].append(game)
         
     verileri_kaydet(); st.query_params.clear(); st.rerun()
 
-# --- 💉 GÖRSEL TASARIM (Grand Aesthetic CSS) ---
+# --- 💉 GÖRSEL TASARIM ---
 st.markdown("""
     <style>
     .stApp { background-color: #fcfcfc; }
     .cat-header { font-size: 0.8rem; font-weight: 800; color: #444; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #eee; margin-top: 20px; padding-bottom: 2px; }
     .sub-cat-label { font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 12px; margin-bottom: 2px; padding-left: 2px; }
-    
     .game-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
     .game-title { font-size: 13px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; }
     .icon-group { display: flex; gap: 10px; flex-shrink: 0; }
     .nano-icon { text-decoration: none !important; color: #ccc !important; font-size: 15px; transition: 0.2s; }
     .nano-icon:hover { color: #ff4b4b !important; }
     
-    /* ANA BUTON TASARIMI */
     div.stButton > button[key="main_btn"] { 
         background-color: #28a745 !important; color: white !important; font-weight: bold !important;
         border-radius: 12px !important; border: none !important; width: 100% !important; height: 42px !important;
-        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2) !important;
     }
-
-    /* 🏷️ METRİK KUTULARI (Genişletilmiş) */
-    .badge-card { 
-        background:#fff; 
-        padding: 15px 20px; /* Hacim artırıldı */
-        border-radius: 14px; 
-        border-left: 5px solid #eee; 
-        box-shadow: 0 4px 15px rgba(0,0,0,0.04); 
-        margin-bottom: 12px; 
-        font-size: 14px;
-        min-height: 80px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
+    .badge-card { background:#fff; padding: 15px 20px; border-radius: 14px; border-left: 5px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 12px; font-size: 14px; display: flex; flex-direction: column; justify-content: center; }
     .badge-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 4px; }
     .badge-value { font-size: 16px; font-weight: 800; color: #333; }
-    
-    /* SEPARATOR ÇİZGİSİ */
     .section-divider { border-top: 1px solid #eee; margin: 25px 0 15px 0; }
     </style>
 """, unsafe_allow_html=True)
@@ -119,7 +116,16 @@ with st.sidebar:
         if games:
             st.markdown(f'<p class="sub-cat-label">{cat}</p>', unsafe_allow_html=True)
             for g in sorted(games):
-                st.markdown(f'<div class="game-row"><span class="game-title">{g}</span><div class="icon-group"><a href="/?act=done&game={g}" target="_self" class="nano-icon">✓</a><a href="/?act=drop&game={g}" target="_self" class="nano-icon">✕</a></div></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div class="game-row">
+                        <span class="game-title">{g}</span>
+                        <div class="icon-group">
+                            <a href="/?act=focus&game={g}" target="_self" class="nano-icon" title="Odaklan ve Taşı">⇄</a>
+                            <a href="/?act=done&game={g}" target="_self" class="nano-icon">✓</a>
+                            <a href="/?act=drop&game={g}" target="_self" class="nano-icon">✕</a>
+                        </div>
+                    </div>
+                ''', unsafe_allow_html=True)
 
     for label, key, act in [("✅ Bitenler", "completed", "undo_done"), ("📁 Vazgeçilenler", "cancelled", "undo_drop")]:
         if st.session_state[key]:
@@ -130,7 +136,6 @@ with st.sidebar:
 
 # --- ANA AKIŞ ---
 st.title("🏛️ Gamer's Archive")
-scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
 oyun_in = st.text_input("Oyun Ara:", placeholder="hades, gow, rdr 2...")
 
 if st.button("Analiz Et", type="primary"):
@@ -152,28 +157,30 @@ if 'current_game' in st.session_state and st.session_state.current_game:
     else:
         app_id, temiz_isim = o['id'], o['name']
         st.image(f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg", use_container_width=True)
-        
         st.subheader(temiz_isim)
         
-        is_anywhere = any(temiz_isim in st.session_state.backlog_dict.get(c, []) for c in st.session_state.categories) or temiz_isim in st.session_state.completed or temiz_isim in st.session_state.cancelled
+        existing_cat = next((c for c in st.session_state.categories if temiz_isim in st.session_state.backlog_dict.get(c, [])), None)
+        is_anywhere = existing_cat or temiz_isim in st.session_state.completed or temiz_isim in st.session_state.cancelled
         
         c_cat, c_add = st.columns([1, 1])
-        sel_cat = c_cat.selectbox("Kategori seçin:", st.session_state.categories, label_visibility="collapsed")
+        sel_cat = c_cat.selectbox("Kategori seçin:", st.session_state.categories, index=st.session_state.categories.index(existing_cat) if existing_cat else 0, label_visibility="collapsed")
         
-        if c_add.button("❌ Kaldır" if is_anywhere else "➕ Arşivime Ekle", key="main_btn"):
+        btn_label = "Kategoriyi Güncelle" if existing_cat else ("❌ Kaldır" if is_anywhere else "➕ Arşivime Ekle")
+        
+        if c_add.button(btn_label, key="main_btn"):
             for cat in list(st.session_state.backlog_dict.keys()):
                 if temiz_isim in st.session_state.backlog_dict[cat]: st.session_state.backlog_dict[cat].remove(temiz_isim)
             if temiz_isim in st.session_state.completed: st.session_state.completed.remove(temiz_isim)
             if temiz_isim in st.session_state.cancelled: st.session_state.cancelled.remove(temiz_isim)
             
-            if not is_anywhere:
+            if not (is_anywhere and btn_label == "❌ Kaldır"):
                 if sel_cat not in st.session_state.backlog_dict: st.session_state.backlog_dict[sel_cat] = []
                 st.session_state.backlog_dict[sel_cat].append(temiz_isim)
+            
             verileri_kaydet(); st.rerun()
 
-        # 💉 FİYATLAR & PUANLAR (Büyük Kutular ve Çizgiler)
+        # Fiyatlar, Skorlar ve Süreler (v5.7 Standartları)
         st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-        
         c1, c2 = st.columns(2)
         try:
             kur = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
@@ -184,11 +191,9 @@ if 'current_game' in st.session_state and st.session_state.current_game:
             ps_url = f"https://store.playstation.com/tr-tr/search/{temiz_isim.replace(' ', '%20')}"
             ps_price = BeautifulSoup(scraper.get(ps_url).text, 'html.parser').find(string=re.compile(r'\d+[,.]\d+\s?TL')).strip()
             c2.markdown(f'<div class="badge-card" style="border-left-color:#003087"><span class="badge-label">PS Store TR</span><span class="badge-value">{ps_price}</span></div>', unsafe_allow_html=True)
-        except: c2.markdown('<div class="badge-card" style="border-left-color:#003087"><span class="badge-label">PS Store TR</span><span class="badge-value">Bulunamadı</span></div>', unsafe_allow_html=True)
+        except: c2.markdown('<div class="badge-card" style="border-left-color:#003087"><span class="badge-label">PS Store TR</span><span class="badge-value">N/A</span></div>', unsafe_allow_html=True)
 
-        # İkinci satır öncesi hafif bir boşluk/çizgi
         st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
-
         s1, s2 = st.columns(2)
         try:
             r_res = scraper.get(f"https://store.steampowered.com/appreviews/{app_id}?json=1&language=all").json()
@@ -207,8 +212,5 @@ if 'current_game' in st.session_state and st.session_state.current_game:
             res = HowLongToBeat().search(re.sub(r'\(.*?\)|[:™®]', '', temiz_isim).strip())
             if res:
                 b = max(res, key=lambda x: x.similarity)
-                h1, h2, h3 = st.columns(3); 
-                h1.success(f"**Main**\n{b.main_story}h"); 
-                h2.warning(f"**Extra**\n{b.main_extra}h"); 
-                h3.error(f"**100%**\n{b.completionist}h")
+                h1, h2, h3 = st.columns(3); h1.success(f"**Main**\n{b.main_story}h"); h2.warning(f"**Extra**\n{b.main_extra}h"); h3.error(f"**100%**\n{b.completionist}h")
         except: pass
