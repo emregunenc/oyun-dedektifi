@@ -9,18 +9,18 @@ import os
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Gamer's Archive", page_icon="🏛️", layout="centered")
 
-# --- 📖 KISALTMA SÖZLÜĞÜ (Alias Dictionary) ---
-# Buraya istediğin kadar kısaltma ekleyebilirsin doktor.
+# --- 📖 KISALTMA VE TAM İSABET SÖZLÜĞÜ ---
 KISALTMALAR = {
+    "hades": "Hades",
+    "hades 2": "Hades II",
+    "hades ii": "Hades II",
     "gta 5": "Grand Theft Auto V",
     "gta v": "Grand Theft Auto V",
     "rdr 2": "Red Dead Redemption 2",
     "gow": "God of War",
     "lol": "League of Legends",
-    "cs go": "Counter-Strike: Global Offensive",
     "cod": "Call of Duty",
-    "fifa": "EA SPORTS FC 24",
-    "hades 2": "Hades II"
+    "fifa": "EA SPORTS FC 24"
 }
 
 # --- HAFIZA YÖNETİMİ ---
@@ -93,17 +93,19 @@ with st.sidebar:
 # --- ANA AKIŞ ---
 st.title("🏛️ Gamer's Archive")
 scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-oyun_input = st.text_input("Oyun Ara:", placeholder="gta 5, gow, rdr 2...")
+oyun_input = st.text_input("Oyun Ara:", placeholder="hades, gta 5, gow...")
 
 if st.button("Analiz Et", type="primary"):
     if oyun_input:
         with st.spinner('Taranıyor...'):
-            # 🩺 KISALTMA TEŞHİSİ: Girişi sözlükle karşılaştırıyoruz
-            arama_terimi = KISALTMALAR.get(oyun_input.lower(), oyun_input)
+            arama_terimi = KISALTMALAR.get(oyun_input.lower().strip(), oyun_input)
             try:
                 s_res = scraper.get(f"https://store.steampowered.com/api/storesearch/?term={arama_terimi}&l=turkish&cc=TR").json()
                 if s_res and s_res['items']:
-                    st.session_state.current_game = s_res['items'][0]
+                    items = s_res['items']
+                    # 💉 TAM İSABET FİLTRESİ: Hades II yerine Hades'i seçer
+                    exact_match = next((i for i in items if i['name'].lower() == arama_terimi.lower()), None)
+                    st.session_state.current_game = exact_match if exact_match else items[0]
                 else: st.session_state.current_game = "NOT_FOUND"
             except: st.session_state.current_game = None
 
@@ -125,7 +127,7 @@ if 'current_game' in st.session_state and st.session_state.current_game:
             if not is_anywhere: st.session_state.backlog.append(temiz_isim)
             verileri_kaydet(); st.rerun()
 
-        # Metrikler ve HLTB
+        # Fiyatlar, Skorlar ve Süreler
         c1, c2 = st.columns(2)
         try:
             kur = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
