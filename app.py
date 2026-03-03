@@ -46,38 +46,34 @@ def undo_action(game, from_list):
     if game not in st.session_state.backlog: st.session_state.backlog.append(game)
     verileri_kaydet()
 
-# --- GÖRSEL TASARIM (Fixed Anchor CSS) ---
+# --- GÖRSEL TASARIM ---
 st.markdown("""
     <style>
     .stApp { background-color: #f9f9f9; }
-    .cat-header { font-size: 0.85rem; font-weight: 700; color: #555; border-bottom: 1px solid #eee; margin-top: 12px; padding-bottom: 3px; }
+    .cat-header { font-size: 0.85rem; font-weight: 700; color: #555; border-bottom: 1px solid #eee; margin-top: 15px; padding-bottom: 3px; }
     
-    /* 🔴 SIDEBAR SABİT HİZALAMA */
-    [data-testid="stSidebarUserContent"] {
-        padding-left: 0.3rem !important;
-        padding-right: 0.3rem !important;
-    }
-    
-    /* Sütunların yan yana kalmasını zorla ve boşluğu kapat */
+    /* SIDEBAR HİZALAMA */
     [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap !important;
-        gap: 0px !important;
+        gap: 4px !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
     }
     
-    /* ⚓ BUTON SÜTUNLARINA SABİT 30PX KELEPÇE */
-    [data-testid="stSidebar"] [data-testid="column"]:nth-child(2),
-    [data-testid="stSidebar"] [data-testid="column"]:nth-child(3) {
-        flex: none !important;
-        width: 30px !important;
-        min-width: 30px !important;
-    }
-    
-    /* İsim sütunu kalan tüm alanı alsın */
+    /* İsim sütunu */
     [data-testid="stSidebar"] [data-testid="column"]:first-child {
-        flex: 1 !important;
+        flex: 1 1 auto !important;
         min-width: 0 !important;
     }
+    
+    /* Buton sütunları */
+    [data-testid="stSidebar"] [data-testid="column"]:not(:first-child) {
+        flex: 0 0 32px !important;
+        width: 32px !important;
+        min-width: 32px !important;
+    }
 
+    /* NANO BUTONLAR */
     [data-testid="stSidebar"] .stButton > button {
         border: none !important;
         background: transparent !important;
@@ -85,8 +81,8 @@ st.markdown("""
         padding: 0px !important;
         color: #bbb !important;
         font-size: 16px !important;
-        height: 28px !important;
-        width: 28px !important;
+        height: 32px !important;
+        width: 32px !important;
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
@@ -94,54 +90,48 @@ st.markdown("""
     [data-testid="stSidebar"] .stButton > button:hover { color: #ff4b4b !important; }
     
     .game-name-side { 
-        font-size: 13px; 
-        color: #333; 
-        white-space: nowrap !important; 
-        overflow: hidden !important; 
-        text-overflow: ellipsis !important;
-        display: block;
-        line-height: 28px;
+        font-size: 13px; color: #333; display: block;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* 🟢 + ARŞİVİME EKLE BUTONU (Yeşil & Oval) */
+    /* ARŞİVİME EKLE BUTONU */
     div.stButton > button[key="main_add"] {
-        background-color: #28a745 !important;
-        color: white !important;
-        font-weight: bold !important;
-        border-radius: 20px !important;
-        padding: 0.5rem 1.5rem !important;
-        border: none !important;
-        box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3) !important;
+        background-color: #28a745 !important; color: white !important; font-weight: bold !important;
+        border-radius: 20px !important; padding: 0.5rem 1.5rem !important; border: none !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
     }
     
     .badge-card { background:#fff; padding:10px; border-radius:10px; border-left: 5px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px; font-size: 14px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR ---
+# --- YAN PANEL (SIDEBAR) ---
 with st.sidebar:
     st.title("🏛️ Archive")
     
+    # 🎯 Oynanacaklar
     active = [g for g in st.session_state.backlog if g not in st.session_state.completed and g not in st.session_state.cancelled]
     if active:
         st.markdown('<p class="cat-header">🎯 Oynanacaklar</p>', unsafe_allow_html=True)
         for g in active:
-            c_txt, c_c, c_x = st.columns([1, 1, 1]) # CSS ile bunlar ezilecek, 1-1-1 yazabiliriz
+            c_txt, c_c, c_x = st.columns([6, 1, 1])
             c_txt.markdown(f"<span class='game-name-side'>{g}</span>", unsafe_allow_html=True)
             if c_c.button("✓", key=f"c_{g}"): move_complete(g); st.rerun()
             if c_x.button("✕", key=f"x_{g}"): move_cancel(g); st.rerun()
 
+    # ✅ Bitenler
     if st.session_state.completed:
         st.markdown('<p class="cat-header">✅ Bitenler</p>', unsafe_allow_html=True)
         for g in st.session_state.completed:
-            c_txt, c_u = st.columns([1, 1])
+            c_txt, c_u = st.columns([6, 1])
             c_txt.markdown(f"<span class='game-name-side' style='color:#28a745;'>✦ {g}</span>", unsafe_allow_html=True)
             if c_u.button("↩", key=f"u_c_{g}"): undo_action(g, "completed"); st.rerun()
 
+    # 📁 Vazgeçilenler
     if st.session_state.cancelled:
         st.markdown('<p class="cat-header">📁 Vazgeçilenler</p>', unsafe_allow_html=True)
         for g in st.session_state.cancelled:
-            c_txt, c_u = st.columns([1, 1])
+            c_txt, c_u = st.columns([6, 1])
             c_txt.markdown(f"<span class='game-name-side' style='color:#aaa; text-decoration:line-through;'>✖ {g}</span>", unsafe_allow_html=True)
             if c_u.button("↩", key=f"u_v_{g}"): undo_action(g, "cancelled"); st.rerun()
 
@@ -174,13 +164,13 @@ if 'current_game' in st.session_state and st.session_state.current_game:
         is_in = temiz_isim in st.session_state.backlog
         if c_add.button("❌ Kaldır" if is_in else "➕ Arşivime Ekle", key="main_rem" if is_in else "main_add"):
             if is_in:
-                st.session_state.backlog.remove(temiz_isim)
+                if temiz_isim in st.session_state.backlog: st.session_state.backlog.remove(temiz_isim)
                 if temiz_isim in st.session_state.completed: st.session_state.completed.remove(temiz_isim)
                 if temiz_isim in st.session_state.cancelled: st.session_state.cancelled.remove(temiz_isim)
             else: st.session_state.backlog.append(temiz_isim)
             verileri_kaydet(); st.rerun()
 
-        # Fiyatlar, Skorlar ve Süreler (Stabil Yapı)
+        # Metrikler ve HLTB
         c1, c2 = st.columns(2)
         try:
             kur = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
@@ -191,7 +181,7 @@ if 'current_game' in st.session_state and st.session_state.current_game:
             ps_url = f"https://store.playstation.com/tr-tr/search/{temiz_isim.replace(' ', '%20')}"
             ps_price = BeautifulSoup(scraper.get(ps_url).text, 'html.parser').find(string=re.compile(r'\d+[,.]\d+\s?TL')).strip()
             c2.markdown(f'<div class="badge-card" style="border-left-color:#003087"><b>PS Store:</b><br>{ps_price}</div>', unsafe_allow_html=True)
-        except: c2.markdown('<div class="badge-card"><b>PS Store:</b> N/A</div>', unsafe_allow_html=True)
+        except: pass
 
         st.markdown("---") 
         s1, s2 = st.columns(2)
