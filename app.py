@@ -50,27 +50,34 @@ def undo_action(game, from_list):
 st.markdown("""
     <style>
     .stApp { background-color: #f9f9f9; }
-    .cat-header { font-size: 0.85rem; font-weight: 700; color: #555; border-bottom: 1px solid #eee; margin-top: 15px; padding-bottom: 3px; }
-    
-    /* SIDEBAR HİZALAMA */
+    .cat-header {
+        font-size: 0.85rem; font-weight: 700; color: #555;
+        border-bottom: 1px solid #eee; margin-top: 15px; padding-bottom: 3px;
+    }
+
+    /* ── SIDEBAR SATIR: isim alanı genişlesin, butonlar sabit kalsın ── */
     [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
+        display: flex !important;
         flex-wrap: nowrap !important;
-        gap: 4px !important;
         align-items: center !important;
-        justify-content: flex-start !important;
+        gap: 2px !important;
+        width: 100% !important;
     }
-    
-    /* İsim sütunu */
-    [data-testid="stSidebar"] [data-testid="column"]:first-child {
-        flex: 1 1 auto !important;
+
+    /* İsim sütunu: kalan tüm alanı al */
+    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {
+        flex: 1 1 0% !important;
         min-width: 0 !important;
+        max-width: none !important;
+        overflow: hidden !important;
     }
-    
-    /* Buton sütunları */
-    [data-testid="stSidebar"] [data-testid="column"]:not(:first-child) {
-        flex: 0 0 32px !important;
-        width: 32px !important;
-        min-width: 32px !important;
+
+    /* Buton sütunları: 28px sabit */
+    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] > div[data-testid="column"]:not(:first-child) {
+        flex: 0 0 28px !important;
+        width: 28px !important;
+        min-width: 28px !important;
+        max-width: 28px !important;
     }
 
     /* NANO BUTONLAR */
@@ -78,43 +85,60 @@ st.markdown("""
         border: none !important;
         background: transparent !important;
         box-shadow: none !important;
-        padding: 0px !important;
+        padding: 0 !important;
+        margin: 0 !important;
         color: #bbb !important;
-        font-size: 16px !important;
-        height: 32px !important;
-        width: 32px !important;
+        font-size: 15px !important;
+        height: 28px !important;
+        width: 28px !important;
+        min-width: 28px !important;
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
     }
     [data-testid="stSidebar"] .stButton > button:hover { color: #ff4b4b !important; }
-    
-    .game-name-side { 
-        font-size: 13px; color: #333; display: block;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+
+    /* Oyun ismi */
+    .game-name-side {
+        font-size: 13px;
+        color: #333;
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100%;
     }
 
     /* ARŞİVİME EKLE BUTONU */
     div.stButton > button[key="main_add"] {
-        background-color: #28a745 !important; color: white !important; font-weight: bold !important;
-        border-radius: 20px !important; padding: 0.5rem 1.5rem !important; border: none !important;
+        background-color: #28a745 !important;
+        color: white !important;
+        font-weight: bold !important;
+        border-radius: 20px !important;
+        padding: 0.5rem 1.5rem !important;
+        border: none !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
     }
-    
-    .badge-card { background:#fff; padding:10px; border-radius:10px; border-left: 5px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px; font-size: 14px; }
+
+    .badge-card {
+        background: #fff; padding: 10px; border-radius: 10px;
+        border-left: 5px solid #ddd;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        margin-bottom: 10px; font-size: 14px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 # --- YAN PANEL (SIDEBAR) ---
 with st.sidebar:
     st.title("🏛️ Archive")
-    
+
     # 🎯 Oynanacaklar
     active = [g for g in st.session_state.backlog if g not in st.session_state.completed and g not in st.session_state.cancelled]
     if active:
         st.markdown('<p class="cat-header">🎯 Oynanacaklar</p>', unsafe_allow_html=True)
         for g in active:
-            c_txt, c_c, c_x = st.columns([6, 1, 1])
+            c_txt, c_c, c_x = st.columns([10, 1, 1])
             c_txt.markdown(f"<span class='game-name-side'>{g}</span>", unsafe_allow_html=True)
             if c_c.button("✓", key=f"c_{g}"): move_complete(g); st.rerun()
             if c_x.button("✕", key=f"x_{g}"): move_cancel(g); st.rerun()
@@ -123,7 +147,7 @@ with st.sidebar:
     if st.session_state.completed:
         st.markdown('<p class="cat-header">✅ Bitenler</p>', unsafe_allow_html=True)
         for g in st.session_state.completed:
-            c_txt, c_u = st.columns([6, 1])
+            c_txt, c_u = st.columns([10, 1])
             c_txt.markdown(f"<span class='game-name-side' style='color:#28a745;'>✦ {g}</span>", unsafe_allow_html=True)
             if c_u.button("↩", key=f"u_c_{g}"): undo_action(g, "completed"); st.rerun()
 
@@ -131,7 +155,7 @@ with st.sidebar:
     if st.session_state.cancelled:
         st.markdown('<p class="cat-header">📁 Vazgeçilenler</p>', unsafe_allow_html=True)
         for g in st.session_state.cancelled:
-            c_txt, c_u = st.columns([6, 1])
+            c_txt, c_u = st.columns([10, 1])
             c_txt.markdown(f"<span class='game-name-side' style='color:#aaa; text-decoration:line-through;'>✖ {g}</span>", unsafe_allow_html=True)
             if c_u.button("↩", key=f"u_v_{g}"): undo_action(g, "cancelled"); st.rerun()
 
@@ -157,10 +181,10 @@ if 'current_game' in st.session_state and st.session_state.current_game:
         o = st.session_state.current_game
         app_id, temiz_isim = o['id'], o['name']
         st.image(f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg", use_container_width=True)
-        
+
         c_title, c_add = st.columns([2, 1.3])
         c_title.subheader(temiz_isim)
-        
+
         is_in = temiz_isim in st.session_state.backlog
         if c_add.button("❌ Kaldır" if is_in else "➕ Arşivime Ekle", key="main_rem" if is_in else "main_add"):
             if is_in:
@@ -183,7 +207,7 @@ if 'current_game' in st.session_state and st.session_state.current_game:
             c2.markdown(f'<div class="badge-card" style="border-left-color:#003087"><b>PS Store:</b><br>{ps_price}</div>', unsafe_allow_html=True)
         except: pass
 
-        st.markdown("---") 
+        st.markdown("---")
         s1, s2 = st.columns(2)
         try:
             r_res = scraper.get(f"https://store.steampowered.com/appreviews/{app_id}?json=1&language=all").json()
