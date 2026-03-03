@@ -46,27 +46,37 @@ def undo_action(game, from_list):
     if game not in st.session_state.backlog: st.session_state.backlog.append(game)
     verileri_kaydet()
 
-# --- GÖRSEL TASARIM (Mikro-Dikiş CSS) ---
+# --- GÖRSEL TASARIM (Fixed Anchor CSS) ---
 st.markdown("""
     <style>
     .stApp { background-color: #f9f9f9; }
     .cat-header { font-size: 0.85rem; font-weight: 700; color: #555; border-bottom: 1px solid #eee; margin-top: 12px; padding-bottom: 3px; }
     
-    /* 🔴 SIDEBAR RADİKAL DARALTMA: image_a7a2c7.png'deki taşmayı çözer */
+    /* 🔴 SIDEBAR SABİT HİZALAMA */
     [data-testid="stSidebarUserContent"] {
-        padding-left: 0.2rem !important;
-        padding-right: 0.2rem !important;
+        padding-left: 0.3rem !important;
+        padding-right: 0.3rem !important;
     }
     
-    /* SÜTUNLARI BİRBİRİNE YAPIŞTIRMA */
+    /* Sütunların yan yana kalmasını zorla ve boşluğu kapat */
     [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap !important;
-        gap: 2px !important; /* Sütunlar arası boşluğu neredeyse yok ettik */
+        gap: 0px !important;
     }
     
-    /* İsim alanını geniş, buton alanlarını dar tutma */
-    [data-testid="stSidebar"] [data-testid="column"]:first-child { flex: 10 !important; min-width: 0 !important; }
-    [data-testid="stSidebar"] [data-testid="column"]:not(:first-child) { flex: 1 !important; min-width: 32px !important; }
+    /* ⚓ BUTON SÜTUNLARINA SABİT 30PX KELEPÇE */
+    [data-testid="stSidebar"] [data-testid="column"]:nth-child(2),
+    [data-testid="stSidebar"] [data-testid="column"]:nth-child(3) {
+        flex: none !important;
+        width: 30px !important;
+        min-width: 30px !important;
+    }
+    
+    /* İsim sütunu kalan tüm alanı alsın */
+    [data-testid="stSidebar"] [data-testid="column"]:first-child {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
 
     [data-testid="stSidebar"] .stButton > button {
         border: none !important;
@@ -74,13 +84,14 @@ st.markdown("""
         box-shadow: none !important;
         padding: 0px !important;
         color: #bbb !important;
-        font-size: 18px !important; /* İkonu biraz büyüttük */
-        height: 32px !important;
-        width: 32px !important;
+        font-size: 16px !important;
+        height: 28px !important;
+        width: 28px !important;
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
     }
+    [data-testid="stSidebar"] .stButton > button:hover { color: #ff4b4b !important; }
     
     .game-name-side { 
         font-size: 13px; 
@@ -89,24 +100,25 @@ st.markdown("""
         overflow: hidden !important; 
         text-overflow: ellipsis !important;
         display: block;
-        line-height: 32px; /* Butonlarla aynı hizaya getirir */
+        line-height: 28px;
     }
 
-    /* 🟢 + ARŞİVİME EKLE BUTONU */
+    /* 🟢 + ARŞİVİME EKLE BUTONU (Yeşil & Oval) */
     div.stButton > button[key="main_add"] {
         background-color: #28a745 !important;
         color: white !important;
         font-weight: bold !important;
         border-radius: 20px !important;
-        padding: 0.5rem 1rem !important;
+        padding: 0.5rem 1.5rem !important;
         border: none !important;
+        box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3) !important;
     }
     
     .badge-card { background:#fff; padding:10px; border-radius:10px; border-left: 5px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px; font-size: 14px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- YAN PANEL (SIDEBAR) ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.title("🏛️ Archive")
     
@@ -114,8 +126,7 @@ with st.sidebar:
     if active:
         st.markdown('<p class="cat-header">🎯 Oynanacaklar</p>', unsafe_allow_html=True)
         for g in active:
-            # Çok agresif oranlar: Yazı(80), Butonlar(10+10)
-            c_txt, c_c, c_x = st.columns([0.8, 0.1, 0.1])
+            c_txt, c_c, c_x = st.columns([1, 1, 1]) # CSS ile bunlar ezilecek, 1-1-1 yazabiliriz
             c_txt.markdown(f"<span class='game-name-side'>{g}</span>", unsafe_allow_html=True)
             if c_c.button("✓", key=f"c_{g}"): move_complete(g); st.rerun()
             if c_x.button("✕", key=f"x_{g}"): move_cancel(g); st.rerun()
@@ -123,21 +134,21 @@ with st.sidebar:
     if st.session_state.completed:
         st.markdown('<p class="cat-header">✅ Bitenler</p>', unsafe_allow_html=True)
         for g in st.session_state.completed:
-            c_txt, c_u = st.columns([0.85, 0.15])
+            c_txt, c_u = st.columns([1, 1])
             c_txt.markdown(f"<span class='game-name-side' style='color:#28a745;'>✦ {g}</span>", unsafe_allow_html=True)
             if c_u.button("↩", key=f"u_c_{g}"): undo_action(g, "completed"); st.rerun()
 
     if st.session_state.cancelled:
         st.markdown('<p class="cat-header">📁 Vazgeçilenler</p>', unsafe_allow_html=True)
         for g in st.session_state.cancelled:
-            c_txt, c_u = st.columns([0.85, 0.15])
+            c_txt, c_u = st.columns([1, 1])
             c_txt.markdown(f"<span class='game-name-side' style='color:#aaa; text-decoration:line-through;'>✖ {g}</span>", unsafe_allow_html=True)
             if c_u.button("↩", key=f"u_v_{g}"): undo_action(g, "cancelled"); st.rerun()
 
 # --- ANA AKIŞ ---
 st.title("🏛️ Gamer's Archive")
 scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-oyun_adi = st.text_input("Oyun Ara:", placeholder="Hades, God of War...")
+oyun_adi = st.text_input("Oyun Ara:", placeholder="Hades, Elden Ring...")
 
 if st.button("Analiz Et", type="primary"):
     if oyun_adi:
@@ -166,11 +177,10 @@ if 'current_game' in st.session_state and st.session_state.current_game:
                 st.session_state.backlog.remove(temiz_isim)
                 if temiz_isim in st.session_state.completed: st.session_state.completed.remove(temiz_isim)
                 if temiz_isim in st.session_state.cancelled: st.session_state.cancelled.remove(temiz_isim)
-            else:
-                st.session_state.backlog.append(temiz_isim)
+            else: st.session_state.backlog.append(temiz_isim)
             verileri_kaydet(); st.rerun()
 
-        # Fiyatlar, Skorlar ve Süreler (v4.8.5 ile aynı stabil yapı)
+        # Fiyatlar, Skorlar ve Süreler (Stabil Yapı)
         c1, c2 = st.columns(2)
         try:
             kur = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
