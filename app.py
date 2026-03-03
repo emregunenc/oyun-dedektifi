@@ -46,18 +46,22 @@ def undo_action(game, from_list):
     if game not in st.session_state.backlog: st.session_state.backlog.append(game)
     verileri_kaydet()
 
-# --- GÖRSEL TASARIM (Border-Excision CSS) ---
+# --- GÖRSEL TASARIM (Mobil Sabitleme CSS) ---
 st.markdown("""
     <style>
     .stApp { background-color: #f9f9f9; }
     .cat-header { font-size: 0.85rem; font-weight: 700; color: #555; border-bottom: 1px solid #eee; margin-top: 15px; padding-bottom: 3px; }
     
-    /* 🔴 SIDEBAR NANO-ICONLAR: image_a89329.png'deki kutucukları tamamen yok eden radikal kural */
+    /* 🔴 MOBİL HİZALAMA: image_a7bdc9.png'deki alt alta kaymayı engeller */
+    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important; /* Alt satıra geçmeyi yasaklar */
+        align-items: center !important;
+    }
+    
     [data-testid="stSidebar"] .stButton > button {
         border: none !important;
         background: transparent !important;
         box-shadow: none !important;
-        outline: none !important;
         padding: 0px !important;
         color: #bbb !important;
         font-size: 16px !important;
@@ -65,16 +69,19 @@ st.markdown("""
         width: 24px !important;
         min-height: 24px !important;
         min-width: 24px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
     }
-    [data-testid="stSidebar"] .stButton > button:hover {
-        color: #ff4b4b !important;
-        background: transparent !important;
+    
+    /* İsim çok uzunsa butonları itmesin, üç nokta koysun */
+    .game-name-side { 
+        font-size: 13px; 
+        color: #333; 
+        white-space: nowrap !important; 
+        overflow: hidden !important; 
+        text-overflow: ellipsis !important;
+        display: block;
     }
 
-    /* 🟢 + ARŞİVİME EKLE BUTONU: image_a81f84.png estetiği */
+    /* 🟢 + ARŞİVİME EKLE BUTONU */
     div.stButton > button[key="main_add"] {
         background-color: #28a745 !important;
         color: white !important;
@@ -86,7 +93,6 @@ st.markdown("""
     }
     
     .badge-card { background:#fff; padding:10px; border-radius:10px; border-left: 5px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px; font-size: 14px; }
-    .game-name-side { font-size: 13px; color: #333; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -94,30 +100,28 @@ st.markdown("""
 with st.sidebar:
     st.title("🏛️ Gamer's Archive")
     
-    # Oynanacaklar
     active = [g for g in st.session_state.backlog if g not in st.session_state.completed and g not in st.session_state.cancelled]
     if active:
         st.markdown('<p class="cat-header">🎯 Oynanacaklar</p>', unsafe_allow_html=True)
         for g in active:
-            c_txt, c_c, c_x = st.columns([5, 1, 1])
+            # Sütun oranlarını daralttık, böylece mobilde isim daha çok yer alır
+            c_txt, c_c, c_x = st.columns([4, 0.6, 0.6])
             c_txt.markdown(f"<span class='game-name-side'>{g}</span>", unsafe_allow_html=True)
             if c_c.button("✓", key=f"c_{g}"): move_complete(g); st.rerun()
             if c_x.button("✕", key=f"x_{g}"): move_cancel(g); st.rerun()
 
-    # Oynadıklarım
     if st.session_state.completed:
         st.markdown('<p class="cat-header">✅ Oynadıklarım</p>', unsafe_allow_html=True)
         for g in st.session_state.completed:
-            c_txt, c_u = st.columns([6, 1.2])
-            c_txt.markdown(f"<span style='color:#28a745; font-size:13px;'>✦ {g}</span>", unsafe_allow_html=True)
+            c_txt, c_u = st.columns([5, 0.8])
+            c_txt.markdown(f"<span class='game-name-side' style='color:#28a745;'>✦ {g}</span>", unsafe_allow_html=True)
             if c_u.button("↩", key=f"u_c_{g}"): undo_action(g, "completed"); st.rerun()
 
-    # Vazgeçtiklerim
     if st.session_state.cancelled:
         st.markdown('<p class="cat-header">📁 Vazgeçtiklerim</p>', unsafe_allow_html=True)
         for g in st.session_state.cancelled:
-            c_txt, c_u = st.columns([6, 1.2])
-            c_txt.markdown(f"<span style='color:#aaa; font-size:13px; text-decoration:line-through;'>✖ {g}</span>", unsafe_allow_html=True)
+            c_txt, c_u = st.columns([5, 0.8])
+            c_txt.markdown(f"<span class='game-name-side' style='color:#aaa; text-decoration:line-through;'>✖ {g}</span>", unsafe_allow_html=True)
             if c_u.button("↩", key=f"u_v_{g}"): undo_action(g, "cancelled"); st.rerun()
 
 # --- ANA AKIŞ ---
@@ -156,7 +160,7 @@ if 'current_game' in st.session_state and st.session_state.current_game:
                 st.session_state.backlog.append(temiz_isim)
             verileri_kaydet(); st.rerun()
 
-        # Fiyatlar
+        # Fiyatlar, Skorlar ve HLTB blokları (v4.8.2 ile aynı stabil yapıda)
         c1, c2 = st.columns(2)
         try:
             kur = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
@@ -169,9 +173,7 @@ if 'current_game' in st.session_state and st.session_state.current_game:
             c2.markdown(f'<div class="badge-card" style="border-left-color:#003087"><b>PS Store:</b><br>{ps_price}</div>', unsafe_allow_html=True)
         except: c2.markdown('<div class="badge-card"><b>PS Store:</b> N/A</div>', unsafe_allow_html=True)
 
-        st.markdown("---") # image_a88842.png ayırıcı çizgi
-
-        # Skorlar
+        st.markdown("---") 
         s1, s2 = st.columns(2)
         try:
             r_res = scraper.get(f"https://store.steampowered.com/appreviews/{app_id}?json=1&language=all").json()
@@ -184,9 +186,7 @@ if 'current_game' in st.session_state and st.session_state.current_game:
             s2.markdown(f'<div class="badge-card" style="border-left-color:#ffcc33"><b>Metascore:</b><br>{meta}/100</div>', unsafe_allow_html=True)
         except: pass
 
-        st.markdown("---") 
-
-        # Süreler (image_a81f84.png renkli bloklar)
+        st.markdown("---")
         st.markdown('<p style="font-size:0.9rem; font-weight:bold;">⏳ HowLongToBeat Süreleri</p>', unsafe_allow_html=True)
         try:
             res = HowLongToBeat().search(re.sub(r'\(.*?\)|[:™®]', '', temiz_isim).strip())
