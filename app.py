@@ -16,7 +16,7 @@ KISALTMALAR = {
 }
 
 # --- HAFIZA YÖNETİMİ ---
-DB_FILE = "oyun_kutuphanem_v5_16.pkl"
+DB_FILE = "oyun_kutuphanem_v5_17.pkl"
 
 def verileri_kaydet():
     data = {
@@ -45,12 +45,12 @@ verileri_yukle()
 # --- 💉 POP-UP (DIALOG) ---
 @st.dialog("🎯 Oyun Yönetimi")
 def kategori_degistir_dialog(game):
-    st.write(f"**{game}** için kategori revizyonu:")
+    st.write(f"**{game}** için yönetim paneli:")
     current_cat = next((c for c in st.session_state.categories if game in st.session_state.backlog_dict.get(c, [])), "Genel")
-    yeni_cat = st.selectbox("Yeni Kategori:", st.session_state.categories, index=st.session_state.categories.index(current_cat))
+    yeni_cat = st.selectbox("Kategori:", st.session_state.categories, index=st.session_state.categories.index(current_cat))
     
     c_upd, c_rem = st.columns(2)
-    if c_upd.button("✅ Uygula", use_container_width=True):
+    if c_upd.button("✅ Güncelle", use_container_width=True):
         for c in list(st.session_state.backlog_dict.keys()):
             if game in st.session_state.backlog_dict[c]: st.session_state.backlog_dict[c].remove(game)
         if yeni_cat not in st.session_state.backlog_dict: st.session_state.backlog_dict[yeni_cat] = []
@@ -76,28 +76,28 @@ if "act" in params:
         if action == "done": st.session_state.completed.append(game)
         verileri_kaydet(); st.query_params.clear(); st.rerun()
 
-# --- 💉 GÖRSEL TASARIM (Contrast & Focus CSS) ---
+# --- 💉 GÖRSEL TASARIM (Heavy Impact CSS) ---
 st.markdown("""
     <style>
     .stApp { background-color: #fcfcfc; }
-    .cat-header { font-size: 0.85rem; font-weight: 800; color: #444; text-transform: uppercase; border-bottom: 2px solid #eee; margin-top: 20px; padding-bottom: 2px; }
-    .sub-cat-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; margin-top: 15px; margin-bottom: 5px; }
+    .cat-header { font-size: 0.85rem; font-weight: 800; color: #333; text-transform: uppercase; border-bottom: 2px solid #eee; margin-top: 25px; padding-bottom: 4px; }
+    .sub-cat-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; margin-top: 18px; margin-bottom: 6px; }
     
-    /* 💉 OYUN İSİMLERİ: Daha belirgin ve güçlü */
-    .game-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-radius: 4px; transition: 0.2s; }
-    .game-row:hover { background: #f0f2f6; }
+    /* 💉 OYUN İSİMLERİ: Font Weight 800 (Extra Bold) */
+    .game-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; transition: 0.15s; border-bottom: 1px solid transparent; }
+    .game-row:hover { background: #f1f3f7; border-radius: 6px; padding-left: 5px; }
     .game-title { 
-        font-size: 14px; 
-        font-weight: 600; /* Kalınlaştırıldı */
-        color: #111 !important; /* Daha derin siyah */
+        font-size: 15px; 
+        font-weight: 800 !important; /* Maksimum vurgu */
+        color: #000 !important; /* Tam siyah */
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; 
     }
     
-    .icon-group { display: flex; gap: 12px; flex-shrink: 0; padding-left: 10px; }
-    .nano-icon { text-decoration: none !important; color: #bbb !important; font-size: 16px; font-weight: bold; }
+    .icon-group { display: flex; gap: 14px; flex-shrink: 0; padding-left: 10px; padding-right: 5px; }
+    .nano-icon { text-decoration: none !important; color: #ccc !important; font-size: 17px; }
     .nano-icon:hover { color: #ff4b4b !important; }
     
-    div.stButton > button[key="main_btn"] { background-color: #28a745 !important; color: white !important; border-radius: 12px !important; }
+    div.stButton > button[key="main_btn"] { background-color: #28a745 !important; color: white !important; border-radius: 12px !important; height: 45px !important; font-weight: 700 !important; }
     .badge-card { background:#fff; padding: 15px 20px; border-radius: 14px; border-left: 5px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 12px; font-size: 14px; display: flex; flex-direction: column; justify-content: center; }
     .badge-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 4px; }
     .badge-value { font-size: 16px; font-weight: 800; color: #333; }
@@ -187,7 +187,7 @@ if 'current_game' in st.session_state and st.session_state.current_game:
             verileri_kaydet(); st.rerun()
 
         st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-        # Metrikler (Steam, PS, Skorlar, HLTB)...
+        # Metrikler ve Süreler (v5.7 Standartları)
         c1, c2 = st.columns(2)
         try:
             kur = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
