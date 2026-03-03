@@ -16,89 +16,69 @@ KISALTMALAR = {
 }
 
 # --- HAFIZA YÖNETİMİ ---
-DB_FILE = "oyun_kutuphanem_v5_14.pkl"
+DB_FILE = "oyun_kutuphanem_v5_15.pkl"
 
 def verileri_kaydet():
     data = {
         'backlog_dict': st.session_state.backlog_dict,
         'completed': list(set(st.session_state.completed)),
-        'cancelled': list(set(st.session_state.cancelled)),
         'categories': st.session_state.categories
     }
     with open(DB_FILE, 'wb') as f: pickle.dump(data, f)
 
 def verileri_yukle():
-    for key in ['backlog_dict', 'completed', 'cancelled', 'categories']:
-        if key not in st.session_state:
-            if key == 'backlog_dict': st.session_state.backlog_dict = {"Genel": []}
-            elif key == 'categories': st.session_state.categories = ["Genel", "RPG", "FPS", "Açık Dünya"]
-            else: st.session_state[key] = []
+    if 'backlog_dict' not in st.session_state: st.session_state.backlog_dict = {"Genel": []}
+    if 'completed' not in st.session_state: st.session_state.completed = []
+    # "Vazgeçilenler" artık varsayılan bir kategori
+    if 'categories' not in st.session_state: st.session_state.categories = ["Genel", "RPG", "FPS", "Açık Dünya", "Vazgeçilenler"]
     
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'rb') as f:
                 data = pickle.load(f)
-                for k, v in data.items(): st.session_state[k] = v
+                st.session_state.backlog_dict = data.get('backlog_dict', {"Genel": []})
+                st.session_state.completed = data.get('completed', [])
+                st.session_state.categories = data.get('categories', ["Genel", "RPG", "FPS", "Açık Dünya", "Vazgeçilenler"])
         except: pass
 
 verileri_yukle()
 
-# --- 💉 POP-UP (DIALOG) MANTIĞI ---
+# --- 💉 POP-UP (DIALOG) ---
 @st.dialog("🎯 Oyun Yönetimi")
 def kategori_degistir_dialog(game):
-    st.write(f"**{game}** için cerrahi plan:")
+    st.write(f"**{game}** için kategori revizyonu:")
+    current_cat = next((c for c in st.session_state.categories if game in st.session_state.backlog_dict.get(c, [])), "Genel")
+    yeni_cat = st.selectbox("Yeni Kategori:", st.session_state.categories, index=st.session_state.categories.index(current_cat))
     
-    current_cat = "Genel"
-    for c in st.session_state.categories:
-        if game in st.session_state.backlog_dict.get(c, []):
-            current_cat = c
-            break
-            
-    yeni_cat = st.selectbox("Hedef Kategori:", st.session_state.categories, 
-                            index=st.session_state.categories.index(current_cat))
-    
-    c_upd, c_rem = st.columns(2)
-    
-    if c_upd.button("✅ Uygula", use_container_width=True):
-        # Taşıma işlemi
+    if st.button("✅ Kategoriyi Güncelle", use_container_width=True):
         for c in list(st.session_state.backlog_dict.keys()):
-            if game in st.session_state.backlog_dict[c]:
-                st.session_state.backlog_dict[c].remove(game)
-        if yeni_cat not in st.session_state.backlog_dict:
-            st.session_state.backlog_dict[yeni_cat] = []
+            if game in st.session_state.backlog_dict[c]: st.session_state.backlog_dict[c].remove(game)
+        if yeni_cat not in st.session_state.backlog_dict: st.session_state.backlog_dict[yeni_cat] = []
         st.session_state.backlog_dict[yeni_cat].append(game)
-        
-        verileri_kaydet()
-        # 💉 KESİN KAPANIŞ: URL'yi temizleyip yenileme yapıyoruz
-        st.query_params.clear() 
-        st.rerun()
-
-    if c_rem.button("🗑️ Kaldır", type="primary", use_container_width=True):
-        # Tam temizlik
-        for c in list(st.session_state.backlog_dict.keys()):
-            if game in st.session_state.backlog_dict[c]:
-                st.session_state.backlog_dict[c].remove(game)
-        if game in st.session_state.completed: st.session_state.completed.remove(game)
-        if game in st.session_state.cancelled: st.session_state.cancelled.remove(game)
-        
-        verileri_kaydet()
-        st.query_params.clear() # 💉 KESİN KAPANIŞ
-        st.rerun()
+        verileri_kaydet(); st.query_params.clear(); st.rerun()
 
 # --- 🎯 AKSİYON MANTIĞI ---
 params = st.query_params
 if "act" in params:
     action, game = params["act"], params["game"]
+    
     if action == "move_ui":
-        kategori_degistir_dialog(game) 
+        kategori_degistir_dialog(game)
     else:
+        # Önce oyunu her yerden temizle
         for c in list(st.session_state.backlog_dict.keys()):
             if game in st.session_state.backlog_dict[c]: st.session_state.backlog_dict[c].remove(game)
         if game in st.session_state.completed: st.session_state.completed.remove(game)
-        if game in st.session_state.cancelled: st.session_state.cancelled.remove(game)
-        if action == "done": st.session_state.completed.append(game)
-        elif action == "drop": st.session_state.cancelled.append(game)
-        elif "undo" in action: st.session_state.backlog_dict["Genel"].append(game)
+
+        # Aksiyonu uygula
+        if action == "done":
+            st.session_state.completed.append(game)
+        elif action == "drop":
+            # 💉 MÜDAHALE: "X" artık sadece siliyor, bir yere eklemiyor.
+            pass 
+        elif "undo" in action:
+            st.session_state.backlog_dict["Genel"].append(game)
+            
         verileri_kaydet(); st.query_params.clear(); st.rerun()
 
 # --- 💉 GÖRSEL TASARIM ---
@@ -111,6 +91,7 @@ st.markdown("""
     .game-title { font-size: 13px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; }
     .icon-group { display: flex; gap: 10px; flex-shrink: 0; }
     .nano-icon { text-decoration: none !important; color: #ccc !important; font-size: 15px; }
+    .nano-icon:hover { color: #ff4b4b !important; }
     div.stButton > button[key="main_btn"] { background-color: #28a745 !important; color: white !important; border-radius: 12px !important; }
     .badge-card { background:#fff; padding: 15px 20px; border-radius: 14px; border-left: 5px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 12px; font-size: 14px; display: flex; flex-direction: column; justify-content: center; }
     .badge-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 4px; }
@@ -123,19 +104,16 @@ st.markdown("""
 with st.sidebar:
     st.title("🏛️ Archive")
     with st.expander("🛠️ Kategori Yönetimi"):
-        new_cat = st.text_input("Yeni Kategori Ekle:", key="new_cat_in")
+        new_cat = st.text_input("Ekle:", key="new_cat_in")
         if st.button("➕ Ekle", use_container_width=True) and new_cat:
             if new_cat not in st.session_state.categories:
-                st.session_state.categories.append(new_cat)
-                st.session_state.backlog_dict[new_cat] = []
+                st.session_state.categories.append(new_cat); st.session_state.backlog_dict[new_cat] = []
                 verileri_kaydet(); st.rerun()
         st.markdown("---")
-        silinecek = st.selectbox("Kategori Sil:", [c for c in st.session_state.categories if c != "Genel"])
-        if st.button("🗑️ Kategoriyi Sil", use_container_width=True):
-            oyunlar = st.session_state.backlog_dict.get(silinecek, [])
-            st.session_state.backlog_dict["Genel"].extend(oyunlar)
-            st.session_state.categories.remove(silinecek)
-            if silinecek in st.session_state.backlog_dict: del st.session_state.backlog_dict[silinecek]
+        sil = st.selectbox("Sil:", [c for c in st.session_state.categories if c not in ["Genel", "Vazgeçilenler"]])
+        if st.button("🗑️ Sil", use_container_width=True):
+            st.session_state.backlog_dict["Genel"].extend(st.session_state.backlog_dict.get(sil, []))
+            st.session_state.categories.remove(sil); del st.session_state.backlog_dict[sil]
             verileri_kaydet(); st.rerun()
 
     st.markdown('<p class="cat-header">🎯 Oynanacaklar</p>', unsafe_allow_html=True)
@@ -150,17 +128,15 @@ with st.sidebar:
                         <div class="icon-group">
                             <a href="/?act=move_ui&game={g}" target="_self" class="nano-icon">⇄</a>
                             <a href="/?act=done&game={g}" target="_self" class="nano-icon">✓</a>
-                            <a href="/?act=drop&game={g}" target="_self" class="nano-icon">✕</a>
+                            <a href="/?act=drop&game={g}" target="_self" class="nano-icon" title="Listeden Tamamen Sil">✕</a>
                         </div>
                     </div>
                 ''', unsafe_allow_html=True)
 
-    for label, key, act in [("✅ Bitenler", "completed", "undo_done"), ("📁 Vazgeçilenler", "cancelled", "undo_drop")]:
-        if st.session_state[key]:
-            st.markdown(f'<p class="cat-header">{label}</p>', unsafe_allow_html=True)
-            for g in sorted(st.session_state[key]):
-                color = "#28a745" if key == "completed" else "#bbb"
-                st.markdown(f'<div class="game-row"><span class="game-title" style="color:{color};">{g}</span><div class="icon-group"><a href="/?act={act}&game={g}" target="_self" class="nano-icon">↩</a></div></div>', unsafe_allow_html=True)
+    if st.session_state.completed:
+        st.markdown('<p class="cat-header">✅ Bitenler</p>', unsafe_allow_html=True)
+        for g in sorted(st.session_state.completed):
+            st.markdown(f'<div class="game-row"><span class="game-title" style="color:#28a745;">{g}</span><div class="icon-group"><a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a></div></div>', unsafe_allow_html=True)
 
 # --- ANA AKIŞ ---
 st.title("🏛️ Gamer's Archive")
@@ -190,10 +166,10 @@ if 'current_game' in st.session_state and st.session_state.current_game:
         
         # Oyunun mevcut durumu
         existing_cat = next((c for c in st.session_state.categories if temiz_isim in st.session_state.backlog_dict.get(c, [])), None)
-        is_anywhere = existing_cat or temiz_isim in st.session_state.completed or temiz_isim in st.session_state.cancelled
+        is_anywhere = existing_cat or temiz_isim in st.session_state.completed
         
         c_cat, c_add = st.columns([1, 1])
-        sel_cat = c_cat.selectbox("Kategori seçin:", st.session_state.categories, index=st.session_state.categories.index(existing_cat) if existing_cat else 0, label_visibility="collapsed")
+        sel_cat = c_cat.selectbox("Kategori:", st.session_state.categories, index=st.session_state.categories.index(existing_cat) if existing_cat else 0, label_visibility="collapsed")
         
         btn_label = "Kategoriyi Güncelle" if existing_cat else ("❌ Kaldır" if is_anywhere else "➕ Arşivime Ekle")
         
@@ -201,14 +177,14 @@ if 'current_game' in st.session_state and st.session_state.current_game:
             for cat in list(st.session_state.backlog_dict.keys()):
                 if temiz_isim in st.session_state.backlog_dict[cat]: st.session_state.backlog_dict[cat].remove(temiz_isim)
             if temiz_isim in st.session_state.completed: st.session_state.completed.remove(temiz_isim)
-            if temiz_isim in st.session_state.cancelled: st.session_state.cancelled.remove(temiz_isim)
+            
             if not (is_anywhere and btn_label == "❌ Kaldır"):
                 if sel_cat not in st.session_state.backlog_dict: st.session_state.backlog_dict[sel_cat] = []
                 st.session_state.backlog_dict[sel_cat].append(temiz_isim)
             verileri_kaydet(); st.rerun()
 
+        # Metrikler ve HLTB...
         st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-        # Metrikler (Steam, PS, Skorlar, HLTB)...
         c1, c2 = st.columns(2)
         try:
             kur = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
