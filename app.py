@@ -68,6 +68,11 @@ if "act" in params:
     action, game = params["act"], params["game"]
     if action == "move_ui":
         kategori_degistir_dialog(game)
+    elif action == "undo_done":
+        if game in st.session_state.completed:
+            st.session_state.completed.remove(game)
+            st.session_state.backlog_dict.setdefault("Genel", []).append(game)
+        verileri_kaydet(); st.query_params.clear(); st.rerun()
     else:
         for c in list(st.session_state.backlog_dict.keys()):
             if game in st.session_state.backlog_dict[c]: st.session_state.backlog_dict[c].remove(game)
@@ -75,7 +80,7 @@ if "act" in params:
         if action == "done": st.session_state.completed.append(game)
         verileri_kaydet(); st.query_params.clear(); st.rerun()
 
-# --- 💉 GÖRSEL TASARIM (800 Weight - Baz Tasarım) ---
+# --- 💉 GÖRSEL TASARIM ---
 st.markdown("""
     <style>
     .stApp { background-color: #fcfcfc; }
@@ -90,6 +95,7 @@ st.markdown("""
     .badge-card { background:#fff; padding: 15px 20px; border-radius: 14px; border-left: 5px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 12px; font-size: 14px; display: flex; flex-direction: column; justify-content: center; min-height: 80px; }
     .badge-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 4px; }
     .badge-value { font-size: 16px; font-weight: 800; color: #333; }
+    .tag-badge { display: inline-block; background: #f0f2f6; color: #555; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; margin-right: 5px; margin-bottom: 5px; text-transform: uppercase; }
     .section-divider { border-top: 1px solid #eee; margin: 25px 0 15px 0; }
     </style>
 """, unsafe_allow_html=True)
@@ -146,6 +152,16 @@ if 'current_game' in st.session_state and st.session_state.current_game and st.s
     o = st.session_state.current_game
     app_id, temiz_isim = o['id'], o['name']
     st.image(f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg", use_container_width=True)
+    
+    # --- ETİKETLER (Görselin Hemen Altı - 5 Adet) ---
+    try:
+        details = scraper.get(f"https://store.steampowered.com/api/appdetails?appids={app_id}&l=turkish").json()
+        if details[str(app_id)]['success']:
+            genres = [g['description'] for g in details[str(app_id)]['data'].get('genres', [])][:5]
+            tags_html = "".join([f'<span class="tag-badge">{t}</span>' for t in genres])
+            st.markdown(f'<div style="margin-top: -10px; margin-bottom: 10px;">{tags_html}</div>', unsafe_allow_html=True)
+    except: pass
+
     st.subheader(temiz_isim)
     
     existing_cat = next((c for c in st.session_state.categories if temiz_isim in st.session_state.backlog_dict.get(c, [])), None)
@@ -157,11 +173,10 @@ if 'current_game' in st.session_state and st.session_state.current_game and st.s
             if temiz_isim in st.session_state.backlog_dict[c]: st.session_state.backlog_dict[c].remove(temiz_isim)
         if temiz_isim in st.session_state.completed: st.session_state.completed.remove(temiz_isim)
         st.session_state.backlog_dict.setdefault(sel_cat, []).append(temiz_isim)
-        verileri_kaydet(); st.rerun()
+        verileri_kaydet(); st.query_params.clear(); st.rerun()
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
     
-    # --- METRİKLER (2 Sütun Simetrisi) ---
     c1, c2 = st.columns(2)
     try:
         kur = scraper.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
