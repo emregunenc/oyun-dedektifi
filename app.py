@@ -7,7 +7,7 @@ import pickle
 import os
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Gamer's Archive", page_icon="🏛️", layout="centered")
+st.set_page_config(page_title="Gamer's Archive v2.0", page_icon="🏛️", layout="centered")
 
 # --- 📖 KISALTMALAR ---
 KISALTMALAR = {
@@ -153,12 +153,17 @@ if 'current_game' in st.session_state and st.session_state.current_game and st.s
     app_id, temiz_isim = o['id'], o['name']
     st.image(f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg", use_container_width=True)
     
-    # --- ETİKETLER (Görselin Hemen Altı - 5 Adet) ---
+    # --- ETİKETLER (Tam 5 Adet Olacak Şekilde Düzenlendi) ---
     try:
         details = scraper.get(f"https://store.steampowered.com/api/appdetails?appids={app_id}&l=turkish").json()
         if details[str(app_id)]['success']:
-            genres = [g['description'] for g in details[str(app_id)]['data'].get('genres', [])][:5]
-            tags_html = "".join([f'<span class="tag-badge">{t}</span>' for t in genres])
+            data = details[str(app_id)]['data']
+            genres = [g['description'] for g in data.get('genres', [])]
+            if len(genres) < 5:
+                extra = [c['description'] for c in data.get('categories', [])]
+                genres.extend(extra)
+            final_tags = genres[:5]
+            tags_html = "".join([f'<span class="tag-badge">{t}</span>' for t in final_tags])
             st.markdown(f'<div style="margin-top: -10px; margin-bottom: 10px;">{tags_html}</div>', unsafe_allow_html=True)
     except: pass
 
