@@ -7,7 +7,7 @@ import pickle
 import os
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Gamer's Archive v2.0", page_icon="🏛️", layout="centered")
+st.set_page_config(page_title="Gamer's Archive v2.2", page_icon="🏛️", layout="centered")
 
 # --- 📖 KISALTMALAR ---
 KISALTMALAR = {
@@ -85,8 +85,9 @@ st.markdown("""
     <style>
     .stApp { background-color: #fcfcfc; }
     .cat-header { font-size: 0.85rem; font-weight: 800; color: #333; text-transform: uppercase; border-bottom: 2px solid #eee; margin-top: 25px; padding-bottom: 4px; }
+    .completed-header { margin-top: 50px !important; } 
     .sub-cat-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; margin-top: 18px; margin-bottom: 6px; }
-    .game-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; transition: 0.15s; }
+    .game-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; transition: 0.15s; }
     .game-row:hover { background: #f1f3f7; border-radius: 6px; padding-left: 5px; }
     .game-title { font-size: 15px; font-weight: 800 !important; color: #000 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; }
     .icon-group { display: flex; gap: 14px; flex-shrink: 0; padding-left: 10px; }
@@ -110,7 +111,7 @@ with st.sidebar:
                 st.session_state.categories.append(new_cat); st.session_state.backlog_dict[new_cat] = []
                 verileri_kaydet(); st.rerun()
 
-    st.markdown('<p class="cat-header">🎯 Oynanacaklar</p>', unsafe_allow_html=True)
+    st.markdown('<p class="cat-header">🎯 OYNANACAKLAR</p>', unsafe_allow_html=True)
     for cat in st.session_state.categories:
         games = st.session_state.backlog_dict.get(cat, [])
         if games:
@@ -128,9 +129,16 @@ with st.sidebar:
                 ''', unsafe_allow_html=True)
 
     if st.session_state.completed:
-        st.markdown('<p class="cat-header">✅ Bitenler</p>', unsafe_allow_html=True)
+        st.markdown('<p class="cat-header completed-header">✅ BİTENLER</p>', unsafe_allow_html=True)
         for g in sorted(st.session_state.completed):
-            st.markdown(f'<div class="game-row"><span class="game-title" style="color:#28a745 !important;">{g}</span><div class="icon-group"><a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a></div></div>', unsafe_allow_html=True)
+            st.markdown(f'''
+                <div class="game-row" style="padding: 2px 0;">
+                    <span class="game-title" style="color:#28a745 !important;">{g}</span>
+                    <div class="icon-group">
+                        <a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a>
+                    </div>
+                </div>
+            ''', unsafe_allow_html=True)
 
 # --- ANA AKIŞ ---
 st.title("🏛️ Gamer's Archive")
@@ -153,7 +161,6 @@ if 'current_game' in st.session_state and st.session_state.current_game and st.s
     app_id, temiz_isim = o['id'], o['name']
     st.image(f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg", use_container_width=True)
     
-    # --- ETİKETLER (Tam 5 Adet Olacak Şekilde Düzenlendi) ---
     try:
         details = scraper.get(f"https://store.steampowered.com/api/appdetails?appids={app_id}&l=turkish").json()
         if details[str(app_id)]['success']:
