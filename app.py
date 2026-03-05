@@ -7,7 +7,7 @@ import pickle
 import os
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Gamer's Archive v2.2", page_icon="🏛️", layout="centered")
+st.set_page_config(page_title="Gamer's Archive v2.6", page_icon="🏛️", layout="centered")
 
 # --- 📖 KISALTMALAR ---
 KISALTMALAR = {
@@ -42,7 +42,7 @@ def verileri_yukle():
 
 verileri_yukle()
 
-# --- 💉 POP-UP (DIALOG) ---
+# --- 🎯 AKSİYON MANTIĞI ---
 @st.dialog("🎯 Oyun Yönetimi")
 def kategori_degistir_dialog(game):
     st.write(f"**{game}** için yönetim paneli:")
@@ -62,7 +62,6 @@ def kategori_degistir_dialog(game):
         if game in st.session_state.completed: st.session_state.completed.remove(game)
         verileri_kaydet(); st.query_params.clear(); st.rerun()
 
-# --- 🎯 AKSİYON MANTIĞI ---
 params = st.query_params
 if "act" in params:
     action, game = params["act"], params["game"]
@@ -143,19 +142,34 @@ with st.sidebar:
 # --- ANA AKIŞ ---
 st.title("🏛️ Gamer's Archive")
 scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-oyun_in = st.text_input("Oyun Ara:", placeholder="hades, gow...")
+oyun_in = st.text_input("Oyun Ara:", placeholder="outer worlds, hades, gow...")
 
-if st.button("Analiz Et", type="primary"):
-    if oyun_in:
-        with st.spinner('Taranıyor...'):
-            term = KISALTMALAR.get(oyun_in.lower().strip(), oyun_in)
-            try:
-                s_res = scraper.get(f"https://store.steampowered.com/api/storesearch/?term={term}&l=turkish&cc=TR").json()
-                if s_res and s_res['items']:
-                    st.session_state.current_game = s_res['items'][0]
-                else: st.session_state.current_game = "NOT_FOUND"
-            except: st.session_state.current_game = None
+if oyun_in:
+    try:
+        term = KISALTMALAR.get(oyun_in.lower().strip(), oyun_in)
+        s_res = scraper.get(f"https://store.steampowered.com/api/storesearch/?term={term}&l=turkish&cc=TR").json()
+        
+        if s_res and s_res['items']:
+            # Soundtrack ve DLC olmayan ilk 3 sonucu ayıkla
+            all_results = [i for i in s_res['items'] if "soundtrack" not in i['name'].lower() and "dlc" not in i['name'].lower()]
+            
+            if all_results:
+                # v2.6: İlk sonuç her zaman session_state'e otomatik atanır
+                if 'last_query' not in st.session_state or st.session_state.last_query != term:
+                    st.session_state.current_game = all_results[0]
+                    st.session_state.last_query = term
 
+                # Alternatif butonları göster (Eğer 1'den fazla sonuç varsa)
+                if len(all_results) > 1:
+                    st.markdown('<p style="font-size:0.8rem; font-weight:bold; color:#888; margin-bottom:5px;">Aradığın bu değil mi? Diğer seçenekler:</p>', unsafe_allow_html=True)
+                    cols = st.columns(min(len(all_results), 3))
+                    for idx, item in enumerate(all_results[:3]):
+                        if cols[idx].button(item['name'], key=f"select_{item['id']}", use_container_width=True):
+                            st.session_state.current_game = item
+                            st.rerun()
+    except: pass
+
+# --- ANALİZ SONUCU ---
 if 'current_game' in st.session_state and st.session_state.current_game and st.session_state.current_game != "NOT_FOUND":
     o = st.session_state.current_game
     app_id, temiz_isim = o['id'], o['name']
