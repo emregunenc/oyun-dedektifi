@@ -110,37 +110,44 @@ def check_psplus(game_name):
 
 # --- 🎮 PS STORE FİYAT + MEVCUT MU (PlayStation Store API) ---
 def get_ps_data(game_name):
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         r = requests.get(
             f"https://store.playstation.com/store/api/chihiro/00_09_000/tumbler/TR/tr/999/{requests.utils.quote(game_name)}?suggested_size=5&mode=game",
-            headers=headers,
-            timeout=10
+            headers=headers, timeout=10
         )
         links = r.json().get('links', [])
+        skip_words = ['dlc', "friend's pass", 'upgrade', 'müzik', 'soundtrack']
+        
         for l in links:
-            name = l.get('name', '')
-            if game_name.lower() in name.lower() and 'dlc' not in name.lower():
-                price_raw = l.get('default_sku', {}).get('display_price', '')
-                if price_raw:
-                    return {"available": True, "price": price_raw}
+            name = l.get('name', '').lower()
+            if game_name.lower() in name and not any(w in name for w in skip_words):
+                price = l.get('default_sku', {}).get('display_price', '')
+                ps_url = f"https://store.playstation.com/tr-tr/search/{requests.utils.quote(game_name)}"
+                if price:
+                    return {"available": True, "price": price, "url": ps_url}
+                else:
+                    return {"available": True, "price": None, "url": ps_url}
     except: pass
-    return {"available": False, "price": "N/A"}
+    return {"available": False, "price": None, "url": None}
 
 # --- 🎮 IGDB TOKEN ---
 def get_igdb_token():
-    try:
-        r = requests.post(
-            "https://id.twitch.tv/oauth2/token",
-            params={
-                "client_id": IGDB_CLIENT_ID,
-                "client_secret": IGDB_CLIENT_SECRET,
-                "grant_type": "client_credentials"
-            },
-            timeout=10
-        )
-        return r.json().get('access_token')
-    except: return None
+    if 'igdb_token' not in st.session_state:
+        try:
+            r = requests.post(
+                "https://id.twitch.tv/oauth2/token",
+                params={
+                    "client_id": IGDB_CLIENT_ID,
+                    "client_secret": IGDB_CLIENT_SECRET,
+                    "grant_type": "client_credentials"
+                },
+                timeout=10
+            )
+            st.session_state.igdb_token = r.json().get('access_token')
+        except:
+            st.session_state.igdb_token = None
+    return st.session_state.igdb_token
 
 # --- 🖥️ IGDB PLATFORM BİLGİSİ ---
 def get_igdb_platforms(game_name):
@@ -237,9 +244,9 @@ st.markdown("""<style>
     .icon-group { display: flex; gap: 14px; flex-shrink: 0; padding-left: 10px; }
     .nano-icon { text-decoration: none !important; color: #ccc !important; font-size: 17px; }
     div.stButton > button[key="main_btn"] { background-color: #28a745 !important; color: white !important; border-radius: 12px !important; height: 45px !important; font-weight: 700 !important; }
-    .badge-card { background:#fff; padding: 15px 15px; border-radius: 14px; border-left: 5px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 12px; font-size: 13px; min-height: 80px; display: flex; flex-direction: column; justify-content: center; }
-    .badge-label { font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 4px; }
-    .badge-value { font-size: 14px; font-weight: 800; color: #333; }
+    .badge-card { background:#fff !important; padding: 15px 15px; border-radius: 14px; border-left: 5px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 12px; font-size: 13px; min-height: 80px; display: flex; flex-direction: column; justify-content: center; }
+    .badge-label { font-size: 10px; font-weight: 700; color: #999 !important; text-transform: uppercase; margin-bottom: 4px; }
+    .badge-value { font-size: 14px; font-weight: 800; color: #333 !important; }
     .tag-badge { display: inline-block; background: #f0f2f6; color: #555; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; margin-right: 5px; margin-bottom: 5px; text-transform: uppercase; }
     .gp-badge { background-color: #107c10; color: white !important; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 12px; margin-bottom: 15px; text-transform: uppercase; }
     .gp-badge-no { background-color: #555; color: white !important; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 12px; margin-bottom: 15px; text-transform: uppercase; }
@@ -268,7 +275,7 @@ with st.sidebar:
     if st.session_state.completed:
         st.markdown('<p class="cat-header" style="margin-top:50px;">✅ BİTENLER</p>', unsafe_allow_html=True)
         for g in sorted(st.session_state.completed):
-            st.markdown(f'''<div class="game-row"><span class="game-title" style="color:#28a745 !important;">{g}</span><div class="icon-group"><a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a></div></div>''', unsafe_allow_html=True)
+            st.markdown(f'''<div class="game-row"><span class="game-title" style="color:#28a745 !important;font-size:15px !important;">{g}</span><div class="icon-group"><a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a></div></div>''', unsafe_allow_html=True)
 
 # --- ANA AKIŞ ---
 st.title("🏛️ Gamer's Archive")
@@ -346,11 +353,17 @@ if 'current_game' in st.session_state and st.session_state.current_game:
     try:  # Steam
         kur = requests.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
         f_usd = o.get('price', {}).get('final', 0) / 100
-        c1.markdown(f'<div class="badge-card" style="border-left-color:#1b2838"><span class="badge-label">Steam</span><span class="badge-value">{f_usd*kur:.0f} TL</span></div>', unsafe_allow_html=True)
+        c1.markdown(f'<div class="badge-card" style="border-left-color:#1b2838"><span class="badge-label">Steam</span><span class="badge-value">{f_usd*kur:.0f} TL <span style="font-size:11px;color:#28a745;font-weight:400;">(${f_usd:.2f})</span></span></div>', unsafe_allow_html=True)
     except: pass
 
     # PS Store fiyatı (API ile)
-    c2.markdown(f'<div class="badge-card" style="border-left-color:#003087"><span class="badge-label">PS Store</span><span class="badge-value">{ps_data["price"]}</span></div>', unsafe_allow_html=True)
+    ps_search_url = f"https://store.playstation.com/tr-tr/search/{requests.utils.quote(temiz_isim)}"
+    if ps_data.get("price"):
+        c2.markdown(f'<div class="badge-card" style="border-left-color:#003087"><span class="badge-label">PS Store</span><span class="badge-value">{ps_data["price"]}</span></div>', unsafe_allow_html=True)
+    elif ps_data.get("available"):
+        c2.markdown(f'<div class="badge-card" style="border-left-color:#003087"><span class="badge-label">PS Store</span><span class="badge-value"><a href="{ps_search_url}" target="_blank" style="color:#003087;text-decoration:none;font-size:13px;">Mağazada Gör →</a></span></div>', unsafe_allow_html=True)
+    else:
+        c2.markdown('<div class="badge-card" style="border-left-color:#003087"><span class="badge-label">PS Store</span><span class="badge-value">N/A</span></div>', unsafe_allow_html=True)
 
     # Epic Games fiyatı (ITAD)
     c3.markdown(f'<div class="badge-card" style="border-left-color:#333"><span class="badge-label">Epic Store</span><span class="badge-value">{get_epic_price(temiz_isim)}</span></div>', unsafe_allow_html=True)
