@@ -1,18 +1,21 @@
 import streamlit as st
 import requests
 import cloudscraper
-from bs4 import BeautifulSoup
 from howlongtobeatpy import HowLongToBeat
 import re
 import pickle
 import os
+import json
 
 # --- 🧪 KONFİGÜRASYON ---
 STEAM_API_KEY = "E722F690EA2642D98FA54A973F703860"
 ITAD_API_KEY = "fb00f3da8717cec28c29230c6751e795aaeec8d6"
+RAWG_API_KEY = "d0cc05e711884b91911e36cb2f2e44cc"
+IGDB_CLIENT_ID = "2bugrxp3scbr1l493je0fgex1mop4h"
+IGDB_CLIENT_SECRET = "j400fdeqok9biwj8x879k980iuz8ue"
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Gamer's Archive v4.1", page_icon="🏛️", layout="centered")
+st.set_page_config(page_title="Gamer's Archive v4.2", page_icon="🏛️", layout="centered")
 
 # --- 📖 KISALTMALAR ---
 KISALTMALAR = {
@@ -47,40 +50,146 @@ def verileri_yukle():
 
 verileri_yukle()
 
-# --- 🎯 EPIC GAMES FİYAT MOTORU (ITAD v3 - POST - shop id: 16) ---
-def get_epic_price_v4(game_name):
+# --- 🎯 EPIC GAMES FİYAT (ITAD v3) ---
+def get_epic_price(game_name):
     clean_name = re.sub(r'\(.*?\)|[:™®]', '', game_name).strip()
     try:
-        # 1. Oyunun ITAD ID'sini bul
         lookup = requests.get(
             "https://api.isthereanydeal.com/games/lookup/v1",
             params={"key": ITAD_API_KEY, "title": clean_name},
             timeout=5
         ).json()
-
         if not lookup.get('game'):
             return "N/A"
-
         game_id = lookup['game']['id']
-
-        # 2. Fiyatları POST ile çek
         prices = requests.post(
             "https://api.isthereanydeal.com/games/prices/v3",
             params={"key": ITAD_API_KEY, "country": "TR"},
             json=[game_id],
             timeout=5
         ).json()
-
-        # 3. Epic Games shop id = 16
         if prices and isinstance(prices, list):
             for item in prices:
                 for deal in item.get('deals', []):
                     if deal.get('shop', {}).get('id') == 16:
-                        amount = deal['price']['amount']
-                        return f"{amount:.0f} TL"
+                        return f"{deal['price']['amount']:.0f} TL"
+    except: pass
+    return "N/A"
 
-    except Exception:
-        pass
+# --- 🎮 GAME PASS KONTROLÜ (Microsoft Catalog API) ---
+def check_gamepass(game_name):
+    try:
+        r = requests.get(
+            "https://catalog.gamepass.com/sigls/v2?id=fdd9e2a7-0fee-49f6-ad69-4354098401ff&language=tr-TR&market=TR",
+            timeout=10
+        )
+        game_ids = [item['id'] for item in r.json() if 'id' in item]
+        ids_str = ",".join(game_ids)
+        r2 = requests.get(
+            f"https://displaycatalog.mp.microsoft.com/v7.0/products?bigIds={ids_str}&market=TR&languages=tr-TR&MS-CV=DGU1mcuYo0WMMp",
+            timeout=15
+        )
+        products = r2.json().get('Products', [])
+        for p in products:
+            if p.get('LocalizedProperties'):
+                title = p['LocalizedProperties'][0]['ProductTitle']
+                if game_name.lower() in title.lower():
+                    return True
+    except: pass
+    return False
+
+# --- 🎮 PS PLUS KONTROLÜ (Yerel JSON) ---
+def check_psplus(game_name):
+    try:
+        with open("psplus_games.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        games = data.get("games", [])
+        return any(game_name.lower() in g.lower() or g.lower() in game_name.lower() for g in games)
+    except: pass
+    return False
+
+# --- 🎮 PS STORE FİYAT + MEVCUT MU (PlayStation Store API) ---
+def get_ps_data(game_name):
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        r = requests.get(
+            f"https://store.playstation.com/store/api/chihiro/00_09_000/tumbler/TR/tr/999/{requests.utils.quote(game_name)}?suggested_size=5&mode=game",
+            headers=headers,
+            timeout=10
+        )
+        links = r.json().get('links', [])
+        for l in links:
+            name = l.get('name', '')
+            if game_name.lower() in name.lower() and 'dlc' not in name.lower():
+                price_raw = l.get('default_sku', {}).get('display_price', '')
+                if price_raw:
+                    return {"available": True, "price": price_raw}
+    except: pass
+    return {"available": False, "price": "N/A"}
+
+# --- 🎮 IGDB TOKEN ---
+def get_igdb_token():
+    try:
+        r = requests.post(
+            "https://id.twitch.tv/oauth2/token",
+            params={
+                "client_id": IGDB_CLIENT_ID,
+                "client_secret": IGDB_CLIENT_SECRET,
+                "grant_type": "client_credentials"
+            },
+            timeout=10
+        )
+        return r.json().get('access_token')
+    except: return None
+
+# --- 🖥️ IGDB PLATFORM BİLGİSİ ---
+def get_igdb_platforms(game_name):
+    try:
+        token = get_igdb_token()
+        if not token: return []
+        r = requests.post(
+            "https://api.igdb.com/v4/games",
+            headers={
+                "Client-ID": IGDB_CLIENT_ID,
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "text/plain"
+            },
+            data=f'search "{game_name}"; fields platforms.name; limit 1;',
+            timeout=10
+        )
+        results = r.json()
+        if results:
+            return [p['name'] for p in results[0].get('platforms', [])]
+    except: pass
+    return []
+
+# --- ⭐ METACRITIC (IGDB API) ---
+def get_metacritic(game_name):
+    try:
+        token = get_igdb_token()
+        if not token: return "N/A"
+        clean = re.sub(r'[™®]', '', game_name).strip()
+        r = requests.post(
+            "https://api.igdb.com/v4/games",
+            headers={
+                "Client-ID": IGDB_CLIENT_ID,
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "text/plain"
+            },
+            data=f'search "{clean}"; fields name,aggregated_rating; limit 5;',
+            timeout=10
+        )
+        results = r.json()
+        if results:
+            # En iyi isim eşleşmesini bul
+            for game in results:
+                if clean.lower() in game['name'].lower() or game['name'].lower() in clean.lower():
+                    if game.get('aggregated_rating'):
+                        return str(round(game['aggregated_rating']))
+            # Eşleşme yoksa ilk sonucu dön
+            if results[0].get('aggregated_rating'):
+                return str(round(results[0]['aggregated_rating']))
+    except: pass
     return "N/A"
 
 # --- 🎯 AKSİYON MANTIĞI ---
@@ -133,7 +242,9 @@ st.markdown("""<style>
     .badge-value { font-size: 14px; font-weight: 800; color: #333; }
     .tag-badge { display: inline-block; background: #f0f2f6; color: #555; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; margin-right: 5px; margin-bottom: 5px; text-transform: uppercase; }
     .gp-badge { background-color: #107c10; color: white !important; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 12px; margin-bottom: 15px; text-transform: uppercase; }
+    .gp-badge-no { background-color: #555; color: white !important; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 12px; margin-bottom: 15px; text-transform: uppercase; }
     .ps-badge { background-color: #003087; color: white !important; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 12px; margin-bottom: 15px; text-transform: uppercase; }
+    .ps-badge-no { background-color: #555; color: white !important; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 12px; margin-bottom: 15px; text-transform: uppercase; }
     .section-divider { border-top: 1px solid #eee; margin: 25px 0 15px 0; }
 </style>""", unsafe_allow_html=True)
 
@@ -207,17 +318,26 @@ if 'current_game' in st.session_state and st.session_state.current_game:
         st.session_state.backlog_dict.setdefault(sel_cat, []).append(temiz_isim)
         verileri_kaydet(); st.rerun()
 
-    # Abonelikler
+    # Abonelikler (API ile)
     st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
     sub1, sub2 = st.columns(2)
-    try:
-        gp_p = scraper.get(f"https://www.xbox.com/tr-TR/xbox-game-pass/games?query={temiz_isim.replace(' ', '+')}").text.lower()
-        sub1.markdown(f'<div class="gp-badge">GAME PASS: {"DAHİL" if temiz_isim.lower() in gp_p and "game-pass" in gp_p else "YOK"}</div>', unsafe_allow_html=True)
-    except: sub1.markdown('<div class="gp-badge" style="opacity:0.5;">GAME PASS: ?</div>', unsafe_allow_html=True)
-    try:
-        ps_p = scraper.get(f"https://www.playstation.com/tr-tr/ps-plus/games/?query={temiz_isim.replace(' ', '%20')}").text.lower()
-        sub2.markdown(f'<div class="ps-badge">PS PLUS: {"DAHİL" if "plus-extra" in ps_p and temiz_isim.lower() in ps_p else "YOK"}</div>', unsafe_allow_html=True)
-    except: sub2.markdown('<div class="ps-badge" style="opacity:0.5;">PS PLUS: ?</div>', unsafe_allow_html=True)
+
+    with st.spinner(""):
+        gp = check_gamepass(temiz_isim)
+        ps_data = get_ps_data(temiz_isim)
+        psplus = check_psplus(temiz_isim)
+
+    if gp:
+        sub1.markdown('<div class="gp-badge">🎮 GAME PASS: DAHİL</div>', unsafe_allow_html=True)
+    else:
+        sub1.markdown('<div class="gp-badge-no">🎮 GAME PASS: YOK</div>', unsafe_allow_html=True)
+
+    if psplus:
+        sub2.markdown('<div class="ps-badge">🎮 PS PLUS: DAHİL</div>', unsafe_allow_html=True)
+    elif ps_data["available"]:
+        sub2.markdown('<div class="ps-badge-no">🎮 PS PLUS: YOK</div>', unsafe_allow_html=True)
+    else:
+        sub2.markdown('<div class="ps-badge-no">🎮 PS STORE: YOK</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
@@ -228,12 +348,12 @@ if 'current_game' in st.session_state and st.session_state.current_game:
         f_usd = o.get('price', {}).get('final', 0) / 100
         c1.markdown(f'<div class="badge-card" style="border-left-color:#1b2838"><span class="badge-label">Steam</span><span class="badge-value">{f_usd*kur:.0f} TL</span></div>', unsafe_allow_html=True)
     except: pass
-    try:  # PS Store
-        ps_p = BeautifulSoup(scraper.get(f"https://store.playstation.com/tr-tr/search/{temiz_isim.replace(' ', '%20')}").text, 'html.parser').find(string=re.compile(r'\d+[,.]\d+\s?TL')).strip()
-        c2.markdown(f'<div class="badge-card" style="border-left-color:#003087"><span class="badge-label">PS Store</span><span class="badge-value">{ps_p}</span></div>', unsafe_allow_html=True)
-    except: c2.markdown('<div class="badge-card" style="border-left-color:#003087"><span class="badge-label">PS Store</span><span class="badge-value">N/A</span></div>', unsafe_allow_html=True)
-    # Epic Games
-    c3.markdown(f'<div class="badge-card" style="border-left-color:#333"><span class="badge-label">Epic Store</span><span class="badge-value">{get_epic_price_v4(temiz_isim)}</span></div>', unsafe_allow_html=True)
+
+    # PS Store fiyatı (API ile)
+    c2.markdown(f'<div class="badge-card" style="border-left-color:#003087"><span class="badge-label">PS Store</span><span class="badge-value">{ps_data["price"]}</span></div>', unsafe_allow_html=True)
+
+    # Epic Games fiyatı (ITAD)
+    c3.markdown(f'<div class="badge-card" style="border-left-color:#333"><span class="badge-label">Epic Store</span><span class="badge-value">{get_epic_price(temiz_isim)}</span></div>', unsafe_allow_html=True)
 
     # Puanlar
     st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
@@ -242,10 +362,10 @@ if 'current_game' in st.session_state and st.session_state.current_game:
         r_r = requests.get(f"https://store.steampowered.com/appreviews/{app_id}?json=1&language=all").json()
         s1.markdown(f'<div class="badge-card" style="border-left-color:#28a745"><span class="badge-label">Steam Puanı</span><span class="badge-value">%{int((r_r["query_summary"]["total_positive"]/r_r["query_summary"]["total_reviews"])*100)} Olumlu</span></div>', unsafe_allow_html=True)
     except: pass
-    try:
-        m_s = BeautifulSoup(scraper.get(f"https://www.metacritic.com/search/{temiz_isim.replace(' ', '%20')}/?category=13").text, 'html.parser').find("div", class_=re.compile(r'c-siteReviewScore')).text.strip()
-        s2.markdown(f'<div class="badge-card" style="border-left-color:#ffcc33"><span class="badge-label">Metascore</span><span class="badge-value">{m_s}/100</span></div>', unsafe_allow_html=True)
-    except: s2.markdown('<div class="badge-card" style="border-left-color:#ffcc33"><span class="badge-label">Metascore</span><span class="badge-value">N/A</span></div>', unsafe_allow_html=True)
+
+    # Metacritic (RAWG API ile)
+    meta = get_metacritic(temiz_isim)
+    s2.markdown(f'<div class="badge-card" style="border-left-color:#ffcc33"><span class="badge-label">Metascore</span><span class="badge-value">{meta}{"/100" if meta != "N/A" else ""}</span></div>', unsafe_allow_html=True)
 
     # HLTB
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
