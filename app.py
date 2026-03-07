@@ -505,6 +505,7 @@ if 'current_game' in st.session_state and st.session_state.current_game:
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
     # Mağaza Fiyatları
+    st.markdown(f"<p style='font-size:11px;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;'>💰 {T("prices_title")}</p>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     try:  # Steam
         locale = get_locale()
@@ -534,7 +535,7 @@ if 'current_game' in st.session_state and st.session_state.current_game:
     c3.markdown(f'<div class="badge-card" style="border-left-color:#333"><span class="badge-label">Epic Store</span><span class="badge-value">{get_epic_price(temiz_isim)}</span></div>', unsafe_allow_html=True)
 
     # Puanlar
-    st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+    st.markdown(f"<p style='font-size:11px;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;margin-top:10px;'>⭐ {T('scores_title')}</p>", unsafe_allow_html=True)
     s1, s2 = st.columns(2)
     try:
         r_r = requests.get(f"https://store.steampowered.com/appreviews/{app_id}?json=1&language=all").json()
@@ -544,15 +545,25 @@ if 'current_game' in st.session_state and st.session_state.current_game:
     # Metacritic (RAWG API ile)
     meta = get_metacritic(temiz_isim)
     s2.markdown(f'<div class="badge-card" style="border-left-color:#ffcc33"><span class="badge-label">Metascore</span><span class="badge-value">{meta}{"/100" if meta != "N/A" else ""}</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
     # HLTB
-    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+    st.markdown(f"<p style='font-size:11px;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;'>⏱️ {T('duration_title')}</p>", unsafe_allow_html=True)
     try:
         hltb = HowLongToBeat().search(re.sub(r'\(.*?\)|[:™®]', '', temiz_isim).strip())
         if hltb:
             b = max(hltb, key=lambda x: x.similarity)
+            def fmt_sure(s):
+                try:
+                    s = float(s)
+                    if s <= 0: return "N/A"
+                    frac = s % 1
+                    if frac < 0.25: return f"{int(s)}h"
+                    elif frac < 0.75: return f"{int(s)}.5h"
+                    else: return f"{int(s)+1}h"
+                except: return "N/A"
             h1, h2, h3 = st.columns(3)
-            h1.success(f"**Main**\n{b.main_story}h")
-            h2.warning(f"**Extra**\n{b.main_extra}h")
-            h3.error(f"**100%**\n{b.completionist}h")
+            h1.success(f"**{T('main_story')}**\n{fmt_sure(b.main_story)}")
+            h2.warning(f"**{T('extra')}**\n{fmt_sure(b.main_extra)}")
+            h3.error(f"**{T('completionist')}**\n{fmt_sure(b.completionist)}")
     except: pass

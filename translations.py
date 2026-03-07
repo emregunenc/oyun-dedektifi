@@ -42,6 +42,9 @@ TRANSLATIONS = {
         "hours": "saat",
         "loading": "Yükleniyor...",
         "language_label": "🌍 Dil",
+        "prices_title": "Mağaza Fiyatları",
+        "scores_title": "Puanlar",
+        "duration_title": "Oynanış Süreleri",
     },
     "en": {
         "flag": "🇬🇧",
@@ -86,6 +89,9 @@ TRANSLATIONS = {
         "hours": "hours",
         "loading": "Loading...",
         "language_label": "🌍 Language",
+        "prices_title": "Store Prices",
+        "scores_title": "Scores",
+        "duration_title": "Play Times",
     },
     "de": {
         "flag": "🇩🇪",
@@ -130,6 +136,9 @@ TRANSLATIONS = {
         "hours": "Stunden",
         "loading": "Wird geladen...",
         "language_label": "🌍 Sprache",
+        "prices_title": "Shop-Preise",
+        "scores_title": "Bewertungen",
+        "duration_title": "Spielzeiten",
     },
     "es": {
         "flag": "🇪🇸",
@@ -174,6 +183,9 @@ TRANSLATIONS = {
         "hours": "horas",
         "loading": "Cargando...",
         "language_label": "🌍 Idioma",
+        "prices_title": "Precios",
+        "scores_title": "Puntuaciones",
+        "duration_title": "Tiempos de juego",
     },
     "fr": {
         "flag": "🇫🇷",
@@ -218,6 +230,9 @@ TRANSLATIONS = {
         "hours": "heures",
         "loading": "Chargement...",
         "language_label": "🌍 Langue",
+        "prices_title": "Prix",
+        "scores_title": "Notes",
+        "duration_title": "Temps de jeu",
     },
     "en_uk": {
         "flag": "🇬🇧",
@@ -306,6 +321,9 @@ TRANSLATIONS = {
         "hours": "時間",
         "loading": "読み込み中...",
         "language_label": "🌍 言語",
+        "prices_title": "ストア価格",
+        "scores_title": "スコア",
+        "duration_title": "プレイ時間",
     },
 }
 
