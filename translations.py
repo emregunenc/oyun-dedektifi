@@ -320,11 +320,24 @@ COUNTRY_TO_LANG = {
 }
 
 def get_lang_from_ip() -> str:
-    try:
-        r = requests.get("https://ipapi.co/country/", timeout=5)
-        if r.status_code == 200:
-            country = r.text.strip()
-            return COUNTRY_TO_LANG.get(country, "en")
-    except:
-        pass
-    return "en"
+    # Birden fazla servis dene, bulamazsan TR varsayılan
+    services = [
+        "https://ipapi.co/country/",
+        "https://api.country.is/",
+    ]
+    for url in services:
+        try:
+            r = requests.get(url, timeout=4)
+            if r.status_code == 200:
+                text = r.text.strip()
+                # api.country.is JSON döndürüyor
+                if text.startswith("{"):
+                    import json
+                    country = json.loads(text).get("country", "")
+                else:
+                    country = text
+                if country and len(country) == 2:
+                    return COUNTRY_TO_LANG.get(country, "tr")
+        except:
+            continue
+    return "tr"
