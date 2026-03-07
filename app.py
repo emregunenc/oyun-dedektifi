@@ -283,7 +283,7 @@ if "act" in params:
 # --- 🎨 CSS TASARIM ---
 st.markdown("""<style>
     .stApp { background-color: #fcfcfc; }
-    .cat-header { font-size: 0.85rem; font-weight: 800; color: #333; text-transform: uppercase; border-bottom: 2px solid #eee; margin-top: 25px; padding-bottom: 4px; }
+    .cat-header { font-size: 1.7rem; font-weight: 900; color: #111; text-transform: uppercase; border-bottom: 3px solid #eee; margin-top: 25px; padding-bottom: 4px; }
     .sub-cat-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; margin-top: 18px; margin-bottom: 6px; }
     .game-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; transition: 0.15s; }
     .game-row:hover { background: #f1f3f7; border-radius: 6px; padding-left: 5px; }
@@ -304,28 +304,22 @@ st.markdown("""<style>
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.title("🏛️ Archive")
-
-    # --- 🌍 DİL SEÇİCİ ---
+    # --- 🌍 DİL SEÇİCİ (küçük, üstte) ---
     lang_options = {k: f"{v['flag']} {v['name']}" for k, v in TRANSLATIONS.items()}
     selected_lang = st.selectbox(
-        T("language_label"),
+        "",
         options=list(lang_options.keys()),
         format_func=lambda x: lang_options[x],
         index=list(lang_options.keys()).index(st.session_state.lang),
-        key="lang_selector"
+        key="lang_selector",
+        label_visibility="collapsed"
     )
     if selected_lang != st.session_state.lang:
         st.session_state.lang = selected_lang
         st.rerun()
 
-    with st.expander(T("category_management")):
-        new_c = st.text_input(T("new_category"), key="new_cat_in")
-        if st.button(T("add_button"), use_container_width=True) and new_c:
-            if new_c not in st.session_state.categories:
-                st.session_state.categories.append(new_c)
-                st.session_state.backlog_dict[new_c] = []
-                verileri_kaydet(); st.rerun()
+    st.title("🏛️ Archive")
+
     st.markdown(f'<p class="cat-header">{T("to_play")}</p>', unsafe_allow_html=True)
     for cat in st.session_state.categories:
         games = st.session_state.backlog_dict.get(cat, [])
@@ -336,10 +330,19 @@ with st.sidebar:
     if st.session_state.completed:
         st.markdown(f'<p class="cat-header" style="margin-top:50px;">{T("completed")}</p>', unsafe_allow_html=True)
         for g in sorted(st.session_state.completed):
-            st.markdown(f'''<div class="game-row"><a href="/?q={g}" target="_self" class="game-title" style="text-decoration:none;color:#28a745 !important;font-size:15px !important;">{g}</a><div class="icon-group"><a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a></div></div>''', unsafe_allow_html=True)
+            st.markdown(f'''<div class="game-row"><a href="/?q={g}" target="_self" class="game-title" style="text-decoration:line-through;color:#28a745 !important;font-size:15px !important;opacity:0.7;">{g}</a><div class="icon-group"><a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a></div></div>''', unsafe_allow_html=True)
+
+    # --- 🛠️ KATEGORİ YÖNETİMİ ---
+    st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
+    with st.expander(T("category_management")):
+        new_c = st.text_input(T("new_category"), key="new_cat_in")
+        if st.button(T("add_button"), use_container_width=True) and new_c:
+            if new_c not in st.session_state.categories:
+                st.session_state.categories.append(new_c)
+                st.session_state.backlog_dict[new_c] = []
+                verileri_kaydet(); st.rerun()
 
     # --- 🎯 ÖNERİ SİSTEMİ ---
-    st.markdown('<div style="margin-top: 40px;"></div>', unsafe_allow_html=True)
     with st.expander(T("recommendation_title")):
         PUAN_ARALIK = {
             "95+": (95, 100), "90-94": (90, 94), "85-89": (85, 89),
