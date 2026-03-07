@@ -6,6 +6,7 @@ import re
 import pickle
 import os
 import json
+from translations import TRANSLATIONS, COUNTRY_TO_LANG, get_lang_from_ip
 
 # --- 🧪 KONFİGÜRASYON ---
 STEAM_API_KEY = "E722F690EA2642D98FA54A973F703860"
@@ -50,6 +51,27 @@ def verileri_yukle():
 
 verileri_yukle()
 
+# --- 🌍 LOKALIZASYON ---
+LOCALE_CONFIG = {
+    "tr": {"cc": "TR", "lang": "turkish", "currency": "TRY", "symbol": "TL", "itad_country": "TR"},
+    "de": {"cc": "DE", "lang": "german",  "currency": "EUR", "symbol": "€",  "itad_country": "DE"},
+    "es": {"cc": "ES", "lang": "spanish", "currency": "EUR", "symbol": "€",  "itad_country": "ES"},
+    "fr": {"cc": "FR", "lang": "french",  "currency": "EUR", "symbol": "€",  "itad_country": "FR"},
+    "ja": {"cc": "JP", "lang": "japanese","currency": "JPY", "symbol": "¥",  "itad_country": "JP"},
+    "en_uk": {"cc": "GB", "lang": "english", "currency": "GBP", "symbol": "£",  "itad_country": "GB"},
+    "en": {"cc": "US", "lang": "english", "currency": "USD", "symbol": "$",  "itad_country": "US"},
+}
+
+def get_locale():
+    return LOCALE_CONFIG.get(st.session_state.get("lang", "en"), LOCALE_CONFIG["en"])
+
+# --- 🌍 DİL SİSTEMİ ---
+if "lang" not in st.session_state:
+    st.session_state.lang = get_lang_from_ip()
+
+def T(key):
+    return TRANSLATIONS[st.session_state.lang].get(key, TRANSLATIONS["en"].get(key, key))
+
 # --- 🎯 EPIC GAMES FİYAT (ITAD v3) ---
 def get_epic_price(game_name):
     clean_name = re.sub(r'\(.*?\)|[:™®]', '', game_name).strip()
@@ -62,9 +84,10 @@ def get_epic_price(game_name):
         if not lookup.get('game'):
             return "N/A"
         game_id = lookup['game']['id']
+        locale = get_locale()
         prices = requests.post(
             "https://api.isthereanydeal.com/games/prices/v3",
-            params={"key": ITAD_API_KEY, "country": "TR"},
+            params={"key": ITAD_API_KEY, "country": locale["itad_country"]},
             json=[game_id],
             timeout=5
         ).json()
@@ -72,7 +95,18 @@ def get_epic_price(game_name):
             for item in prices:
                 for deal in item.get('deals', []):
                     if deal.get('shop', {}).get('id') == 16:
-                        return f"{deal['price']['amount']:.0f} TL"
+                        amount = deal['price']['amount']
+                        deal_currency = deal['price'].get('currency', locale['currency'])
+                        if deal_currency == 'USD':
+                            return f"${amount:.2f}"
+                        else:
+                            # USD karşılığını döviz kurundan hesapla
+                            try:
+                                kur = requests.get('https://api.exchangerate-api.com/v4/latest/USD').json()['rates'].get(deal_currency, 1)
+                                usd = amount / kur
+                                return f"{amount:.0f} {locale['symbol']} (${usd:.2f})"
+                            except:
+                                return f"{amount:.0f} {locale['symbol']}"
     except: pass
     return "N/A"
 
@@ -108,22 +142,35 @@ def check_psplus(game_name):
     except: pass
     return False
 
+# --- PS LOCALE ---
+PS_LOCALE = {
+    "tr": ("TR", "tr", "tr-tr"),
+    "de": ("DE", "de", "de-de"),
+    "es": ("ES", "es", "es-es"),
+    "fr": ("FR", "fr", "fr-fr"),
+    "ja": ("JP", "ja", "ja-jp"),
+    "en_uk": ("GB", "en", "en-gb"),
+    "en": ("US", "en", "en-us"),
+}
+
 # --- 🎮 PS STORE FİYAT + MEVCUT MU (PlayStation Store API) ---
 def get_ps_data(game_name):
+    lang = st.session_state.get("lang", "en")
+    country, lang_code, store_locale = PS_LOCALE.get(lang, ("US", "en", "en-us"))
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
         r = requests.get(
-            f"https://store.playstation.com/store/api/chihiro/00_09_000/tumbler/TR/tr/999/{requests.utils.quote(game_name)}?suggested_size=5&mode=game",
+            f"https://store.playstation.com/store/api/chihiro/00_09_000/tumbler/{country}/{lang_code}/999/{requests.utils.quote(game_name)}?suggested_size=5&mode=game",
             headers=headers, timeout=10
         )
         links = r.json().get('links', [])
-        skip_words = ['dlc', "friend's pass", 'upgrade', 'müzik', 'soundtrack']
+        skip_words = ['dlc', "friend's pass", 'upgrade', 'soundtrack']
         
         for l in links:
             name = l.get('name', '').lower()
             if game_name.lower() in name and not any(w in name for w in skip_words):
                 price = l.get('default_sku', {}).get('display_price', '')
-                ps_url = f"https://store.playstation.com/tr-tr/search/{requests.utils.quote(game_name)}"
+                ps_url = f"https://store.playstation.com/{store_locale}/search/{requests.utils.quote(game_name)}"
                 if price:
                     return {"available": True, "price": price, "url": ps_url}
                 else:
@@ -200,18 +247,18 @@ def get_metacritic(game_name):
     return "N/A"
 
 # --- 🎯 AKSİYON MANTIĞI ---
-@st.dialog("🎯 Oyun Yönetimi")
+@st.dialog("🎯 Oyun Yönetimi")  # dialog title translated at runtime
 def kategori_degistir_dialog(game):
-    st.write(f"**{game}** için yönetim paneli:")
+    st.write(f"**{game}**")
     current_cat = next((c for c in st.session_state.categories if game in st.session_state.backlog_dict.get(c, [])), "Genel")
-    yeni_cat = st.selectbox("Kategori:", st.session_state.categories, index=st.session_state.categories.index(current_cat))
+    yeni_cat = st.selectbox(T("category_label"), st.session_state.categories, index=st.session_state.categories.index(current_cat))
     c_upd, c_rem = st.columns(2)
-    if c_upd.button("✅ Güncelle", use_container_width=True):
+    if c_upd.button(T("update_button"), use_container_width=True):
         for c in list(st.session_state.backlog_dict.keys()):
             if game in st.session_state.backlog_dict[c]: st.session_state.backlog_dict[c].remove(game)
         st.session_state.backlog_dict.setdefault(yeni_cat, []).append(game)
         verileri_kaydet(); st.query_params.clear(); st.rerun()
-    if c_rem.button("🗑️ Kaldır", type="primary", use_container_width=True):
+    if c_rem.button(T("remove_button"), type="primary", use_container_width=True):
         for c in list(st.session_state.backlog_dict.keys()):
             if game in st.session_state.backlog_dict[c]: st.session_state.backlog_dict[c].remove(game)
         if game in st.session_state.completed: st.session_state.completed.remove(game)
@@ -258,36 +305,51 @@ st.markdown("""<style>
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("🏛️ Archive")
-    with st.expander("🛠️ Kategori Yönetimi"):
-        new_c = st.text_input("Yeni Ekle:", key="new_cat_in")
-        if st.button("➕ Ekle", use_container_width=True) and new_c:
+
+    # --- 🌍 DİL SEÇİCİ ---
+    lang_options = {k: f"{v['flag']} {v['name']}" for k, v in TRANSLATIONS.items()}
+    selected_lang = st.selectbox(
+        T("language_label"),
+        options=list(lang_options.keys()),
+        format_func=lambda x: lang_options[x],
+        index=list(lang_options.keys()).index(st.session_state.lang),
+        key="lang_selector"
+    )
+    if selected_lang != st.session_state.lang:
+        st.session_state.lang = selected_lang
+        st.rerun()
+
+    with st.expander(T("category_management")):
+        new_c = st.text_input(T("new_category"), key="new_cat_in")
+        if st.button(T("add_button"), use_container_width=True) and new_c:
             if new_c not in st.session_state.categories:
                 st.session_state.categories.append(new_c)
                 st.session_state.backlog_dict[new_c] = []
                 verileri_kaydet(); st.rerun()
-    st.markdown('<p class="cat-header">🎯 OYNANACAKLAR</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="cat-header">{T("to_play")}</p>', unsafe_allow_html=True)
     for cat in st.session_state.categories:
         games = st.session_state.backlog_dict.get(cat, [])
         if games:
             st.markdown(f'<p class="sub-cat-label">{cat}</p>', unsafe_allow_html=True)
             for g in sorted(games):
-                st.markdown(f'''<div class="game-row"><span class="game-title">{g}</span><div class="icon-group"><a href="/?act=move_ui&game={g}" target="_self" class="nano-icon">⇄</a><a href="/?act=done&game={g}" target="_self" class="nano-icon">✓</a><a href="/?act=drop&game={g}" target="_self" class="nano-icon">✕</a></div></div>''', unsafe_allow_html=True)
+                st.markdown(f'''<div class="game-row"><a href="/?q={g}" target="_self" class="game-title" style="text-decoration:none;">{g}</a><div class="icon-group"><a href="/?act=move_ui&game={g}" target="_self" class="nano-icon">⇄</a><a href="/?act=done&game={g}" target="_self" class="nano-icon">✓</a><a href="/?act=drop&game={g}" target="_self" class="nano-icon">✕</a></div></div>''', unsafe_allow_html=True)
     if st.session_state.completed:
-        st.markdown('<p class="cat-header" style="margin-top:50px;">✅ BİTENLER</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="cat-header" style="margin-top:50px;">{T("completed")}</p>', unsafe_allow_html=True)
         for g in sorted(st.session_state.completed):
-            st.markdown(f'''<div class="game-row"><span class="game-title" style="color:#28a745 !important;font-size:15px !important;">{g}</span><div class="icon-group"><a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a></div></div>''', unsafe_allow_html=True)
+            st.markdown(f'''<div class="game-row"><a href="/?q={g}" target="_self" class="game-title" style="text-decoration:none;color:#28a745 !important;font-size:15px !important;">{g}</a><div class="icon-group"><a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a></div></div>''', unsafe_allow_html=True)
 
     # --- 🎯 ÖNERİ SİSTEMİ ---
     st.markdown('<div style="margin-top: 40px;"></div>', unsafe_allow_html=True)
-    with st.expander("🎯 Oyun Önerisi Al"):
+    with st.expander(T("recommendation_title")):
         PUAN_ARALIK = {
             "95+": (95, 100), "90-94": (90, 94), "85-89": (85, 89),
             "80-84": (80, 84), "75-79": (75, 79), "70-74": (70, 74), "60-69": (60, 69)
         }
+        h = T("hours")
         SURE_ARALIK = {
-            "⚡ Tüm Süreler (Hızlı)": None,
-            "0-5 saat": (0, 5), "6-10 saat": (6, 10), "11-15 saat": (11, 15),
-            "16-20 saat": (16, 20), "21-30 saat": (21, 30), "31-50 saat": (31, 50), "50+ saat": (51, 999)
+            T("all_durations"): None,
+            f"0-5 {h}": (0, 5), f"6-10 {h}": (6, 10), f"11-15 {h}": (11, 15),
+            f"16-20 {h}": (16, 20), f"21-30 {h}": (21, 30), f"31-50 {h}": (31, 50), f"50+ {h}": (51, 999)
         }
         ETIKETLER = {
             "Singleplayer": 31, "Multiplayer": 7, "Co-op": 18, "RPG": 24,
@@ -295,20 +357,20 @@ with st.sidebar:
             "Sci-fi": 32, "Fantasy": 64, "Difficult": 49, "FPS": 30, "Sandbox": 37, "Funny": 4
         }
 
-        puan_sec = st.multiselect("⭐ Puan Aralığı (max 3):", list(PUAN_ARALIK.keys()), max_selections=3, key="rec_puan")
-        sure_sec = st.selectbox("⏱️ Oyun Süresi:", list(SURE_ARALIK.keys()), key="rec_sure")
-        etiket_sec = st.multiselect("🏷️ Etiketler (max 3):", list(ETIKETLER.keys()), max_selections=3, key="rec_etiket")
+        puan_sec = st.multiselect(T("rec_score"), list(PUAN_ARALIK.keys()), max_selections=3, key="rec_puan")
+        sure_sec = st.selectbox(T("rec_duration"), list(SURE_ARALIK.keys()), key="rec_sure")
+        etiket_sec = st.multiselect(T("rec_tags"), list(ETIKETLER.keys()), max_selections=3, key="rec_etiket")
 
-        if st.button("🔍 Öneriler Getir", use_container_width=True, key="rec_btn"):
+        if st.button(T("rec_button"), use_container_width=True, key="rec_btn"):
             if not puan_sec:
-                st.warning("En az bir puan aralığı seç.")
+                st.warning(T("rec_no_results"))
             else:
                 # Seçilen puan aralıklarını birleştir
                 puan_min = min(PUAN_ARALIK[p][0] for p in puan_sec)
                 puan_max = max(PUAN_ARALIK[p][1] for p in puan_sec)
                 tag_ids = ",".join([str(ETIKETLER[e]) for e in etiket_sec]) if etiket_sec else None
 
-                with st.spinner("Oyunlar aranıyor..."):
+                with st.spinner(T("rec_searching")):
                     try:
                         params = {
                             "key": RAWG_API_KEY,
@@ -353,14 +415,16 @@ with st.sidebar:
                             gosterilen += 1
 
                         if gosterilen == 0:
-                            st.info("Sonuç bulunamadı, farklı parametreler dene.")
+                            st.info(T("rec_no_results"))
                     except Exception as e:
-                        st.error("Bir hata oluştu.")
+                        st.error(T("rec_error"))
 
 # --- ANA AKIŞ ---
-st.title("🏛️ Gamer's Archive")
+st.markdown(f'<h2 style="margin-bottom:0.5rem;">🏛️ {T("app_title")}</h2>', unsafe_allow_html=True)
 scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-oyun_in = st.text_input("Oyun Ara:", placeholder="hades, rdr2, elden ring...")
+# Sidebar'dan tıklanınca ?q= parametresini al
+q_param = st.query_params.get("q", "")
+oyun_in = st.text_input(T("search_label"), value=q_param, placeholder=T("search_placeholder"))
 
 if oyun_in:
     try:
@@ -369,6 +433,15 @@ if oyun_in:
         if s_res and s_res['items']:
             all_r = [i for i in s_res['items'] if "soundtrack" not in i['name'].lower() and "dlc" not in i['name'].lower()]
             if all_r:
+                # İsim benzerliğine göre sırala - tam eşleşme üste gelsin
+                def isim_skoru(item):
+                    isim = item['name'].lower().strip()
+                    arama = t.lower().strip()
+                    if isim == arama: return 0               # Tam eşleşme
+                    if isim.startswith(arama + ' '): return 1 # Başlangıç eşleşmesi (Hades II)
+                    if arama in isim: return 2               # İçeriyor
+                    return 3                                  # Diğer
+                all_r = sorted(all_r, key=isim_skoru)
                 if 'last_query' not in st.session_state or st.session_state.last_query != t:
                     st.session_state.current_game = all_r[0]; st.session_state.last_query = t
                 cols = st.columns(min(len(all_r), 3))
@@ -398,8 +471,8 @@ if 'current_game' in st.session_state and st.session_state.current_game:
     # Arşive Ekle / Güncelle
     existing_cat = next((c for c in st.session_state.categories if temiz_isim in st.session_state.backlog_dict.get(c, [])), None)
     c_cat, c_add = st.columns([1, 1])
-    sel_cat = c_cat.selectbox("Kategori:", st.session_state.categories, index=st.session_state.categories.index(existing_cat) if existing_cat else 0, label_visibility="collapsed")
-    if c_add.button("Güncelle" if existing_cat else "➕ Arşivime Ekle", key="main_btn", use_container_width=True):
+    sel_cat = c_cat.selectbox(T("category_label"), st.session_state.categories, index=st.session_state.categories.index(existing_cat) if existing_cat else 0, label_visibility="collapsed")
+    if c_add.button(T("update_button") if existing_cat else T("add_to_archive"), key="main_btn", use_container_width=True):
         for c in list(st.session_state.backlog_dict.keys()):
             if temiz_isim in st.session_state.backlog_dict[c]: st.session_state.backlog_dict[c].remove(temiz_isim)
         st.session_state.backlog_dict.setdefault(sel_cat, []).append(temiz_isim)
@@ -415,25 +488,34 @@ if 'current_game' in st.session_state and st.session_state.current_game:
         psplus = check_psplus(temiz_isim)
 
     if gp:
-        sub1.markdown('<div class="gp-badge">🎮 GAME PASS: DAHİL</div>', unsafe_allow_html=True)
+        sub1.markdown(f'<div class="gp-badge">{T("gamepass_yes")}</div>', unsafe_allow_html=True)
     else:
-        sub1.markdown('<div class="gp-badge-no">🎮 GAME PASS: YOK</div>', unsafe_allow_html=True)
+        sub1.markdown(f'<div class="gp-badge-no">{T("gamepass_no")}</div>', unsafe_allow_html=True)
 
     if psplus:
-        sub2.markdown('<div class="ps-badge">🎮 PS PLUS: DAHİL</div>', unsafe_allow_html=True)
+        sub2.markdown(f'<div class="ps-badge">{T("psplus_yes")}</div>', unsafe_allow_html=True)
     elif ps_data["available"]:
-        sub2.markdown('<div class="ps-badge-no">🎮 PS PLUS: YOK</div>', unsafe_allow_html=True)
+        sub2.markdown(f'<div class="ps-badge-no">{T("psplus_no")}</div>', unsafe_allow_html=True)
     else:
-        sub2.markdown('<div class="ps-badge-no">🎮 PS STORE: YOK</div>', unsafe_allow_html=True)
+        sub2.markdown(f'<div class="ps-badge-no">{T("psplus_no")}</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
     # Mağaza Fiyatları
     c1, c2, c3 = st.columns(3)
     try:  # Steam
-        kur = requests.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['TRY']
+        locale = get_locale()
+        kur_r = requests.get(f"https://api.exchangerate-api.com/v4/latest/USD").json()['rates']
+        kur = kur_r.get(locale["currency"], 1)
         f_usd = o.get('price', {}).get('final', 0) / 100
-        c1.markdown(f'<div class="badge-card" style="border-left-color:#1b2838"><span class="badge-label">Steam</span><span class="badge-value">{f_usd*kur:.0f} TL <span style="font-size:11px;color:#28a745;font-weight:400;">(${f_usd:.2f})</span></span></div>', unsafe_allow_html=True)
+        f_local = f_usd * kur
+        if locale["currency"] == "USD":
+            price_str = f"${f_usd:.2f}"
+        elif locale["currency"] == "JPY":
+            price_str = f"{f_local:.0f}{locale['symbol']} (${f_usd:.2f})"
+        else:
+            price_str = f"{f_local:.2f}{locale['symbol']} (${f_usd:.2f})"
+        c1.markdown(f'<div class="badge-card" style="border-left-color:#1b2838"><span class="badge-label">Steam</span><span class="badge-value">{price_str}</span></div>', unsafe_allow_html=True)
     except: pass
 
     # PS Store fiyatı (API ile)
