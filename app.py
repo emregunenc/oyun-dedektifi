@@ -277,6 +277,86 @@ with st.sidebar:
         for g in sorted(st.session_state.completed):
             st.markdown(f'''<div class="game-row"><span class="game-title" style="color:#28a745 !important;font-size:15px !important;">{g}</span><div class="icon-group"><a href="/?act=undo_done&game={g}" target="_self" class="nano-icon">↩</a></div></div>''', unsafe_allow_html=True)
 
+    # --- 🎯 ÖNERİ SİSTEMİ ---
+    st.markdown('<div style="margin-top: 40px;"></div>', unsafe_allow_html=True)
+    with st.expander("🎯 Oyun Önerisi Al"):
+        PUAN_ARALIK = {
+            "95+": (95, 100), "90-94": (90, 94), "85-89": (85, 89),
+            "80-84": (80, 84), "75-79": (75, 79), "70-74": (70, 74), "60-69": (60, 69)
+        }
+        SURE_ARALIK = {
+            "⚡ Tüm Süreler (Hızlı)": None,
+            "0-5 saat": (0, 5), "6-10 saat": (6, 10), "11-15 saat": (11, 15),
+            "16-20 saat": (16, 20), "21-30 saat": (21, 30), "31-50 saat": (31, 50), "50+ saat": (51, 999)
+        }
+        ETIKETLER = {
+            "Singleplayer": 31, "Multiplayer": 7, "Co-op": 18, "RPG": 24,
+            "Open World": 36, "Story Rich": 118, "Atmospheric": 13, "Horror": 16,
+            "Sci-fi": 32, "Fantasy": 64, "Difficult": 49, "FPS": 30, "Sandbox": 37, "Funny": 4
+        }
+
+        puan_sec = st.multiselect("⭐ Puan Aralığı (max 3):", list(PUAN_ARALIK.keys()), max_selections=3, key="rec_puan")
+        sure_sec = st.selectbox("⏱️ Oyun Süresi:", list(SURE_ARALIK.keys()), key="rec_sure")
+        etiket_sec = st.multiselect("🏷️ Etiketler (max 3):", list(ETIKETLER.keys()), max_selections=3, key="rec_etiket")
+
+        if st.button("🔍 Öneriler Getir", use_container_width=True, key="rec_btn"):
+            if not puan_sec:
+                st.warning("En az bir puan aralığı seç.")
+            else:
+                # Seçilen puan aralıklarını birleştir
+                puan_min = min(PUAN_ARALIK[p][0] for p in puan_sec)
+                puan_max = max(PUAN_ARALIK[p][1] for p in puan_sec)
+                tag_ids = ",".join([str(ETIKETLER[e]) for e in etiket_sec]) if etiket_sec else None
+
+                with st.spinner("Oyunlar aranıyor..."):
+                    try:
+                        params = {
+                            "key": RAWG_API_KEY,
+                            "metacritic": f"{puan_min},{puan_max}",
+                            "page_size": 15,
+                            "ordering": "-metacritic",
+                        }
+                        if tag_ids: params["tags"] = tag_ids
+
+                        r = requests.get("https://api.rawg.io/api/games", params=params, timeout=10).json()
+                        results = r.get('results', [])
+
+                        # Arşivdeki oyunları topla
+                        tum_arsiv = set()
+                        for cat_games in st.session_state.backlog_dict.values():
+                            tum_arsiv.update([g.lower() for g in cat_games])
+                        tum_arsiv.update([g.lower() for g in st.session_state.completed])
+
+                        gosterilen = 0
+                        for oyun in results:
+                            if gosterilen >= 5: break
+                            isim = oyun['name']
+                            puan = oyun.get('metacritic', 'N/A')
+                            arsivde = isim.lower() in tum_arsiv
+                            isaretci = " ✅" if arsivde else ""
+
+                            # Süre filtresi (HLTB) - Tüm Süreler seçiliyse atla
+                            sure_aralik = SURE_ARALIK[sure_sec]
+                            if sure_aralik is not None:
+                                try:
+                                    hltb_r = HowLongToBeat().search(isim)
+                                    if hltb_r:
+                                        sure = max(hltb_r, key=lambda x: x.similarity).main_story
+                                        if sure and not (sure_aralik[0] <= sure <= sure_aralik[1]):
+                                            continue
+                                except: pass
+
+                            st.markdown(f'''<div class="game-row" style="padding: 6px 0; border-bottom: 1px solid #f0f0f0;">
+                                <span style="font-size:13px; font-weight:700; color:#000;">{isim}{isaretci}</span>
+                                <span style="font-size:11px; color:#999; font-weight:600;">{puan}</span>
+                            </div>''', unsafe_allow_html=True)
+                            gosterilen += 1
+
+                        if gosterilen == 0:
+                            st.info("Sonuç bulunamadı, farklı parametreler dene.")
+                    except Exception as e:
+                        st.error("Bir hata oluştu.")
+
 # --- ANA AKIŞ ---
 st.title("🏛️ Gamer's Archive")
 scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
