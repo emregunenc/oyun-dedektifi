@@ -290,7 +290,7 @@ st.markdown("""<style>
     .game-title { font-size: 15px; font-weight: 800 !important; color: #000 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; }
     .icon-group { display: flex; gap: 14px; flex-shrink: 0; padding-left: 10px; }
     .nano-icon { text-decoration: none !important; color: #ccc !important; font-size: 17px; }
-    div.stButton > button[key="main_btn"] { background-color: #28a745 !important; color: white !important; border-radius: 12px !important; height: 52px !important; font-weight: 900 !important; font-size: 16px !important; letter-spacing: 1px !important; }
+    div.stButton > button[key="main_btn"] { background-color: #28a745 !important; color: white !important; border-radius: 12px !important; height: 45px !important; font-weight: 700 !important; }
     .badge-card { background:#fff !important; padding: 15px 15px; border-radius: 14px; border-left: 5px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 12px; font-size: 13px; min-height: 80px; display: flex; flex-direction: column; justify-content: center; }
     .badge-label { font-size: 10px; font-weight: 700; color: #999 !important; text-transform: uppercase; margin-bottom: 4px; }
     .badge-value { font-size: 14px; font-weight: 800; color: #333 !important; }
